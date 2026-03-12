@@ -248,6 +248,9 @@ pub struct Config {
     /// User-provided instructions from AGENTS.md.
     pub user_instructions: Option<String>,
 
+    /// Target URL or domain in-scope for security testing.
+    pub security_target: Option<String>,
+
     /// Base instructions override.
     pub base_instructions: Option<String>,
 
@@ -1087,6 +1090,9 @@ pub struct ConfigToml {
     /// System instructions.
     pub instructions: Option<String>,
 
+    /// Target URL or domain in-scope for security testing.
+    pub security_target: Option<String>,
+
     /// Developer instructions inserted as a `developer` role message.
     #[serde(default)]
     pub developer_instructions: Option<String>,
@@ -1708,6 +1714,7 @@ fn add_additional_file_system_writes(
 #[derive(Default, Debug, Clone)]
 pub struct ConfigOverrides {
     pub model: Option<String>,
+    pub security_target: Option<String>,
     pub review_model: Option<String>,
     pub cwd: Option<PathBuf>,
     pub approval_policy: Option<AskForApproval>,
@@ -1872,6 +1879,7 @@ impl Config {
         // Destructure ConfigOverrides fully to ensure all overrides are applied.
         let ConfigOverrides {
             model,
+            security_target: security_target_override,
             review_model: override_review_model,
             cwd,
             approval_policy: approval_policy_override,
@@ -2084,6 +2092,15 @@ impl Config {
         let web_search_mode = resolve_web_search_mode(&cfg, &config_profile, &features)
             .unwrap_or(WebSearchMode::Cached);
         let web_search_config = resolve_web_search_config(&cfg, &config_profile);
+        let security_target = security_target_override
+            .or(config_profile.security_target)
+            .or(cfg.security_target)
+            .or_else(|| {
+                std::env::var("BACKEND_SECURITY_TARGET")
+                    .ok()
+                    .map(|target| target.trim().to_string())
+                    .filter(|target| !target.is_empty())
+            });
 
         let agent_roles = agent_roles::load_agent_roles(&cfg, &config_layer_stack)?;
 
@@ -2096,7 +2113,7 @@ impl Config {
         let model_provider_id = model_provider
             .or(config_profile.model_provider)
             .or(cfg.model_provider)
-            .unwrap_or_else(|| "openai".to_string());
+            .unwrap_or_else(|| "backend".to_string());
         let model_provider = model_providers
             .get(&model_provider_id)
             .ok_or_else(|| {
@@ -2384,6 +2401,7 @@ impl Config {
             enforce_residency: enforce_residency.value,
             notify: cfg.notify,
             user_instructions,
+            security_target,
             base_instructions,
             personality,
             developer_instructions,
