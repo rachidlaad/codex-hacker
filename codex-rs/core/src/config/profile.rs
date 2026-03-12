@@ -20,6 +20,8 @@ use codex_protocol::openai_models::ReasoningEffort;
 #[schemars(deny_unknown_fields)]
 pub struct ConfigProfile {
     pub model: Option<String>,
+    /// Target URL or domain in-scope for security testing.
+    pub security_target: Option<String>,
     pub service_tier: Option<ServiceTier>,
     /// The key in the `model_providers` map identifying the
     /// [`ModelProviderInfo`] to use.

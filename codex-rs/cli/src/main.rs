@@ -13,7 +13,6 @@ use codex_cli::WindowsCommand;
 use codex_cli::login::read_api_key_from_stdin;
 use codex_cli::login::run_login_status;
 use codex_cli::login::run_login_with_api_key;
-use codex_cli::login::run_login_with_chatgpt;
 use codex_cli::login::run_login_with_device_code;
 use codex_cli::login::run_logout;
 use codex_cloud_tasks::Cli as CloudTasksCli;
@@ -267,7 +266,7 @@ struct LoginCommand {
 
     #[arg(
         long = "with-api-key",
-        help = "Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)"
+        help = "Read the backend API token from stdin (e.g. `printenv BACKEND_API_TOKEN | codex login --with-api-key`)"
     )]
     with_api_key: bool,
 
@@ -689,14 +688,17 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
                         .await;
                     } else if login_cli.api_key.is_some() {
                         eprintln!(
-                            "The --api-key flag is no longer supported. Pipe the key instead, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
+                            "The --api-key flag is no longer supported. Pipe the token instead, e.g. `printenv BACKEND_API_TOKEN | codex login --with-api-key`."
                         );
                         std::process::exit(1);
                     } else if login_cli.with_api_key {
                         let api_key = read_api_key_from_stdin();
                         run_login_with_api_key(login_cli.config_overrides, api_key).await;
                     } else {
-                        run_login_with_chatgpt(login_cli.config_overrides).await;
+                        eprintln!(
+                            "No login method selected. Backend mode uses `BACKEND_API_TOKEN`; run `codex login --with-api-key` or set the environment variable directly."
+                        );
+                        run_login_status(login_cli.config_overrides).await;
                     }
                 }
             }
@@ -1067,6 +1069,9 @@ fn merge_interactive_cli_flags(interactive: &mut TuiCli, subcommand_cli: TuiCli)
     }
     if let Some(cwd) = subcommand_cli.cwd {
         interactive.cwd = Some(cwd);
+    }
+    if let Some(security_target) = subcommand_cli.security_target {
+        interactive.security_target = Some(security_target);
     }
     if subcommand_cli.web_search {
         interactive.web_search = true;

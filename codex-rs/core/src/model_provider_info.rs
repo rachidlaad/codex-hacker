@@ -27,6 +27,7 @@ const MAX_STREAM_MAX_RETRIES: u64 = 100;
 const MAX_REQUEST_MAX_RETRIES: u64 = 100;
 
 const OPENAI_PROVIDER_NAME: &str = "OpenAI";
+const SECURITY_BACKEND_PROVIDER_NAME: &str = "Security Backend";
 const CHAT_WIRE_API_REMOVED_ERROR: &str = "`wire_api = \"chat\"` is no longer supported.\nHow to fix: set `wire_api = \"responses\"` in your provider config.\nMore info: https://github.com/openai/codex/discussions/7782";
 pub(crate) const LEGACY_OLLAMA_CHAT_PROVIDER_ID: &str = "ollama-chat";
 pub(crate) const OLLAMA_CHAT_PROVIDER_REMOVED_ERROR: &str = "`ollama-chat` is no longer supported.\nHow to fix: replace `ollama-chat` with `ollama` in `model_provider`, `oss_provider`, or `--local-provider`.\nMore info: https://github.com/openai/codex/discussions/7782";
@@ -256,6 +257,35 @@ impl ModelProviderInfo {
         }
     }
 
+    pub fn create_security_backend_provider() -> ModelProviderInfo {
+        ModelProviderInfo {
+            name: SECURITY_BACKEND_PROVIDER_NAME.into(),
+            base_url: std::env::var("BACKEND_BASE_URL")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| Some("http://127.0.0.1:8000/v1".to_string())),
+            env_key: Some("BACKEND_API_TOKEN".into()),
+            env_key_instructions: Some(
+                "Set BACKEND_API_TOKEN (and optionally BACKEND_BASE_URL) to authenticate against your security backend."
+                    .into(),
+            ),
+            experimental_bearer_token: None,
+            wire_api: WireApi::Responses,
+            query_params: None,
+            http_headers: Some(
+                [("version".to_string(), env!("CARGO_PKG_VERSION").to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: true,
+        }
+    }
+
     pub fn is_openai(&self) -> bool {
         self.name == OPENAI_PROVIDER_NAME
     }
@@ -276,6 +306,7 @@ pub fn built_in_model_providers() -> HashMap<String, ModelProviderInfo> {
     // open source ("oss") providers by default. Users are encouraged to add to
     // `model_providers` in config.toml to add their own providers.
     [
+        ("backend", P::create_security_backend_provider()),
         ("openai", P::create_openai_provider()),
         (
             OLLAMA_OSS_PROVIDER_ID,

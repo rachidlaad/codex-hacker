@@ -1,5 +1,5 @@
 <p align="center"><code>npm i -g @openai/codex</code><br />or <code>brew install --cask codex</code></p>
-<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer.
+<p align="center"><strong>Codex CLI</strong> is a terminal-first security testing agent that runs locally on your computer.
 <p align="center">
   <img src="https://github.com/openai/codex/blob/main/.github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
 </p>
@@ -44,11 +44,19 @@ Each archive contains a single entry with the platform baked into the name (e.g.
 
 </details>
 
-### Using Codex with your ChatGPT plan
+### Configure your backend
 
-Run `codex` and select **Sign in with ChatGPT**. We recommend signing into your ChatGPT account to use Codex as part of your Plus, Pro, Team, Edu, or Enterprise plan. [Learn more about what's included in your ChatGPT plan](https://help.openai.com/en/articles/11369540-codex-in-chatgpt).
+Copy `.env.example` to `.env` and set backend values:
 
-You can also use Codex with an API key, but this requires [additional setup](https://developers.openai.com/codex/auth#sign-in-with-an-api-key).
+```shell
+cp .env.example .env
+```
+
+- `BACKEND_BASE_URL`: base URL for your OpenAI-compatible backend.
+- `BACKEND_API_TOKEN`: bearer token used for backend authentication.
+- `BACKEND_SECURITY_TARGET` (optional): default in-scope URL or domain for auth/session testing.
+
+You can also set the target per run with `codex --target https://example.com`.
 
 ## Docs
 

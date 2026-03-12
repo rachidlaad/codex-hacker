@@ -192,22 +192,22 @@ pub fn read_api_key_from_stdin() -> String {
 
     if stdin.is_terminal() {
         eprintln!(
-            "--with-api-key expects the API key on stdin. Try piping it, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
+            "--with-api-key expects the token on stdin. Try piping it, e.g. `printenv BACKEND_API_TOKEN | codex login --with-api-key`."
         );
         std::process::exit(1);
     }
 
-    eprintln!("Reading API key from stdin...");
+    eprintln!("Reading backend API token from stdin...");
 
     let mut buffer = String::new();
     if let Err(err) = stdin.read_to_string(&mut buffer) {
-        eprintln!("Failed to read API key from stdin: {err}");
+        eprintln!("Failed to read backend API token from stdin: {err}");
         std::process::exit(1);
     }
 
     let api_key = buffer.trim().to_string();
     if api_key.is_empty() {
-        eprintln!("No API key provided via stdin.");
+        eprintln!("No backend API token provided via stdin.");
         std::process::exit(1);
     }
 

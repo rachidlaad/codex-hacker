@@ -371,6 +371,7 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
 
     let overrides = ConfigOverrides {
         model,
+        security_target: cli.security_target.clone(),
         approval_policy,
         sandbox_mode,
         cwd,

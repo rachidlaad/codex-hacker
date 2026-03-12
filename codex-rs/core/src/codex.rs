@@ -426,6 +426,17 @@ impl Codex {
             Some(loaded_plugins.capability_summaries()),
         )
         .await;
+        let user_instructions = if let Some(security_target) = config.security_target.as_deref() {
+            let target_instructions = format!(
+                "Security testing target in scope: {security_target}\nFocus auth/login/session verification on this target unless the user updates scope."
+            );
+            match user_instructions {
+                Some(existing) => Some(format!("{target_instructions}\n\n{existing}")),
+                None => Some(target_instructions),
+            }
+        } else {
+            user_instructions
+        };
 
         let exec_policy = if crate::guardian::is_guardian_subagent_source(&session_source) {
             // Guardian review should rely on the built-in shell safety checks,
