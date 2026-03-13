@@ -15,13 +15,17 @@ use crate::truncate::approx_bytes_for_tokens;
 use tracing::warn;
 
 pub const BASE_INSTRUCTIONS: &str = include_str!("../../prompt.md");
-const DEFAULT_PERSONALITY_HEADER: &str = "You are Codex, a coding agent based on GPT-5. You and the user share the same workspace and collaborate to achieve the user's goals.";
+const DEFAULT_PERSONALITY_HEADER: &str = "You are Uxarion, an agent based on GPT-5. You and the user share the same workspace and collaborate to complete the user's authorized tasks.";
 const LOCAL_FRIENDLY_TEMPLATE: &str =
-    "You optimize for team morale and being a supportive teammate as much as code quality.";
-const LOCAL_PRAGMATIC_TEMPLATE: &str = "You are a deeply pragmatic, effective software engineer.";
+    "You optimize for calm, trustworthy operator communication as much as technical quality.";
+const LOCAL_PRAGMATIC_TEMPLATE: &str = "You are a deeply pragmatic, effective security engineer.";
 const PERSONALITY_PLACEHOLDER: &str = "{{ personality }}";
 
 pub(crate) fn with_config_overrides(mut model: ModelInfo, config: &Config) -> ModelInfo {
+    if model.model_messages.is_none() {
+        model.model_messages = local_personality_messages_for_slug(&model.slug);
+    }
+
     if let Some(supports_reasoning_summaries) = config.model_supports_reasoning_summaries
         && supports_reasoning_summaries
     {
@@ -94,8 +98,8 @@ pub(crate) fn model_info_from_slug(slug: &str) -> ModelInfo {
 }
 
 fn local_personality_messages_for_slug(slug: &str) -> Option<ModelMessages> {
-    match slug {
-        "gpt-5.2-codex" | "exp-codex-personality" => Some(ModelMessages {
+    if slug.starts_with("gpt-5") || slug == "exp-codex-personality" {
+        Some(ModelMessages {
             instructions_template: Some(format!(
                 "{DEFAULT_PERSONALITY_HEADER}\n\n{PERSONALITY_PLACEHOLDER}\n\n{BASE_INSTRUCTIONS}"
             )),
@@ -104,8 +108,9 @@ fn local_personality_messages_for_slug(slug: &str) -> Option<ModelMessages> {
                 personality_friendly: Some(LOCAL_FRIENDLY_TEMPLATE.to_string()),
                 personality_pragmatic: Some(LOCAL_PRAGMATIC_TEMPLATE.to_string()),
             }),
-        }),
-        _ => None,
+        })
+    } else {
+        None
     }
 }
 

@@ -63,7 +63,7 @@ pub struct Cli {
     #[clap(long = "cd", short = 'C', value_name = "DIR")]
     pub cwd: Option<PathBuf>,
 
-    /// Allow running Codex outside a Git repository.
+    /// Allow running Uxarion outside a Git repository.
     #[arg(long = "skip-git-repo-check", global = true, default_value_t = false)]
     pub skip_git_repo_check: bool,
 
@@ -120,6 +120,7 @@ pub enum Command {
     Resume(ResumeArgs),
 
     /// Run a code review against the current repository.
+    #[command(hide = true)]
     Review(ReviewArgs),
 }
 

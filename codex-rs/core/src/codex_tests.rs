@@ -2248,6 +2248,14 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
             Session::build_model_client_beta_features_header(config.as_ref()),
         ),
         code_mode_store: Default::default(),
+        security_state: Arc::new(
+            crate::security::SecuritySessionStateService::new(
+                &config.codex_home,
+                &conversation_id,
+                crate::security::is_security_config(config.as_ref()),
+            )
+            .await,
+        ),
     };
     let js_repl = Arc::new(JsReplHandle::with_node_path(
         config.js_repl_node_path.clone(),
@@ -2809,6 +2817,14 @@ pub(crate) async fn make_session_and_context_with_dynamic_tools_and_rx(
             Session::build_model_client_beta_features_header(config.as_ref()),
         ),
         code_mode_store: Default::default(),
+        security_state: Arc::new(
+            crate::security::SecuritySessionStateService::new(
+                &config.codex_home,
+                &conversation_id,
+                crate::security::is_security_config(config.as_ref()),
+            )
+            .await,
+        ),
     };
     let js_repl = Arc::new(JsReplHandle::with_node_path(
         config.js_repl_node_path.clone(),

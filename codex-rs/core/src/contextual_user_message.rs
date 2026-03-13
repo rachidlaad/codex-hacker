@@ -1,3 +1,7 @@
+use crate::security::SECURITY_CONTEXT_CLOSE_TAG;
+use crate::security::SECURITY_CONTEXT_OPEN_TAG;
+use crate::security::SECURITY_TOOL_INVENTORY_CLOSE_TAG;
+use crate::security::SECURITY_TOOL_INVENTORY_OPEN_TAG;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::ENVIRONMENT_CONTEXT_CLOSE_TAG;
@@ -70,6 +74,13 @@ pub(crate) const ENVIRONMENT_CONTEXT_FRAGMENT: ContextualUserFragmentDefinition 
         ENVIRONMENT_CONTEXT_OPEN_TAG,
         ENVIRONMENT_CONTEXT_CLOSE_TAG,
     );
+pub(crate) const SECURITY_CONTEXT_FRAGMENT: ContextualUserFragmentDefinition =
+    ContextualUserFragmentDefinition::new(SECURITY_CONTEXT_OPEN_TAG, SECURITY_CONTEXT_CLOSE_TAG);
+pub(crate) const SECURITY_TOOL_INVENTORY_FRAGMENT: ContextualUserFragmentDefinition =
+    ContextualUserFragmentDefinition::new(
+        SECURITY_TOOL_INVENTORY_OPEN_TAG,
+        SECURITY_TOOL_INVENTORY_CLOSE_TAG,
+    );
 pub(crate) const SKILL_FRAGMENT: ContextualUserFragmentDefinition =
     ContextualUserFragmentDefinition::new(SKILL_OPEN_TAG, SKILL_CLOSE_TAG);
 pub(crate) const USER_SHELL_COMMAND_FRAGMENT: ContextualUserFragmentDefinition =
@@ -88,6 +99,8 @@ pub(crate) const SUBAGENT_NOTIFICATION_FRAGMENT: ContextualUserFragmentDefinitio
 const CONTEXTUAL_USER_FRAGMENTS: &[ContextualUserFragmentDefinition] = &[
     AGENTS_MD_FRAGMENT,
     ENVIRONMENT_CONTEXT_FRAGMENT,
+    SECURITY_CONTEXT_FRAGMENT,
+    SECURITY_TOOL_INVENTORY_FRAGMENT,
     SKILL_FRAGMENT,
     USER_SHELL_COMMAND_FRAGMENT,
     TURN_ABORTED_FRAGMENT,
@@ -111,6 +124,17 @@ mod tests {
     fn detects_environment_context_fragment() {
         assert!(is_contextual_user_fragment(&ContentItem::InputText {
             text: "<environment_context>\n<cwd>/tmp</cwd>\n</environment_context>".to_string(),
+        }));
+    }
+
+    #[test]
+    fn detects_security_context_fragment() {
+        assert!(is_contextual_user_fragment(&ContentItem::InputText {
+            text: "<security_context>\n{\"scope\":{}}\n</security_context>".to_string(),
+        }));
+        assert!(is_contextual_user_fragment(&ContentItem::InputText {
+            text: "<security_tool_inventory>\n{\"available\":[]}\n</security_tool_inventory>"
+                .to_string(),
         }));
     }
 

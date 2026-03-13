@@ -27,9 +27,11 @@ const MAX_STREAM_MAX_RETRIES: u64 = 100;
 const MAX_REQUEST_MAX_RETRIES: u64 = 100;
 
 const OPENAI_PROVIDER_NAME: &str = "OpenAI";
+const PENTEST_LOCAL_PROVIDER_NAME: &str = "Pentest Local";
 const CHAT_WIRE_API_REMOVED_ERROR: &str = "`wire_api = \"chat\"` is no longer supported.\nHow to fix: set `wire_api = \"responses\"` in your provider config.\nMore info: https://github.com/openai/codex/discussions/7782";
 pub(crate) const LEGACY_OLLAMA_CHAT_PROVIDER_ID: &str = "ollama-chat";
 pub(crate) const OLLAMA_CHAT_PROVIDER_REMOVED_ERROR: &str = "`ollama-chat` is no longer supported.\nHow to fix: replace `ollama-chat` with `ollama` in `model_provider`, `oss_provider`, or `--local-provider`.\nMore info: https://github.com/openai/codex/discussions/7782";
+pub(crate) const PENTEST_LOCAL_PROVIDER_ID: &str = "pentest-local";
 
 /// Wire protocol that the provider speaks.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
@@ -277,6 +279,7 @@ pub fn built_in_model_providers() -> HashMap<String, ModelProviderInfo> {
     // `model_providers` in config.toml to add their own providers.
     [
         ("openai", P::create_openai_provider()),
+        (PENTEST_LOCAL_PROVIDER_ID, create_pentest_local_provider()),
         (
             OLLAMA_OSS_PROVIDER_ID,
             create_oss_provider(DEFAULT_OLLAMA_PORT, WireApi::Responses),
@@ -289,6 +292,37 @@ pub fn built_in_model_providers() -> HashMap<String, ModelProviderInfo> {
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
     .collect()
+}
+
+pub fn create_pentest_local_provider() -> ModelProviderInfo {
+    ModelProviderInfo {
+        name: PENTEST_LOCAL_PROVIDER_NAME.into(),
+        base_url: Some(
+            std::env::var("PENTEST_LOCAL_BASE_URL")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "http://127.0.0.1:8080/v1".to_string()),
+        ),
+        env_key: Some("OPENAI_API_KEY".into()),
+        env_key_instructions: Some(
+            "Set OPENAI_API_KEY to the API key required by your local Responses-compatible backend."
+                .to_string(),
+        ),
+        experimental_bearer_token: None,
+        wire_api: WireApi::Responses,
+        query_params: None,
+        http_headers: Some(
+            [("version".to_string(), env!("CARGO_PKG_VERSION").to_string())]
+                .into_iter()
+                .collect(),
+        ),
+        env_http_headers: None,
+        request_max_retries: None,
+        stream_max_retries: None,
+        stream_idle_timeout_ms: None,
+        requires_openai_auth: false,
+        supports_websockets: false,
+    }
 }
 
 pub fn create_oss_provider(default_provider_port: u16, wire_api: WireApi) -> ModelProviderInfo {
@@ -437,5 +471,17 @@ wire_api = "chat"
 
         let err = toml::from_str::<ModelProviderInfo>(provider_toml).unwrap_err();
         assert!(err.to_string().contains(CHAT_WIRE_API_REMOVED_ERROR));
+    }
+
+    #[test]
+    fn built_in_providers_include_pentest_local() {
+        let providers = built_in_model_providers();
+        let provider = providers
+            .get(PENTEST_LOCAL_PROVIDER_ID)
+            .expect("pentest-local provider should exist");
+        assert_eq!(provider.env_key.as_deref(), Some("OPENAI_API_KEY"));
+        assert_eq!(provider.wire_api, WireApi::Responses);
+        assert!(!provider.requires_openai_auth);
+        assert!(!provider.supports_websockets);
     }
 }

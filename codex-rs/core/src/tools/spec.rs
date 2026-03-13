@@ -96,6 +96,7 @@ pub(crate) struct ToolsConfig {
     pub shell_type: ConfigShellToolType,
     shell_command_backend: ShellCommandBackendConfig,
     pub unified_exec_backend: UnifiedExecBackendConfig,
+    pub security_mode: bool,
     pub allow_login_shell: bool,
     pub apply_patch_tool_type: Option<ApplyPatchToolType>,
     pub web_search_mode: Option<WebSearchMode>,
@@ -206,6 +207,7 @@ impl ToolsConfig {
             shell_type,
             shell_command_backend,
             unified_exec_backend,
+            security_mode: false,
             allow_login_shell: true,
             apply_patch_tool_type,
             web_search_mode: *web_search_mode,
@@ -242,6 +244,22 @@ impl ToolsConfig {
 
     pub fn with_web_search_config(mut self, web_search_config: Option<WebSearchConfig>) -> Self {
         self.web_search_config = web_search_config;
+        self
+    }
+
+    pub fn with_security_mode(mut self, security_mode: bool) -> Self {
+        self.security_mode = security_mode;
+        if security_mode {
+            self.code_mode_enabled = false;
+            self.js_repl_enabled = false;
+            self.js_repl_tools_only = false;
+            self.apply_patch_tool_type = None;
+            self.experimental_supported_tools.clear();
+            self.collab_tools = false;
+            self.artifact_tools = false;
+            self.agent_jobs_tools = false;
+            self.agent_jobs_worker_tools = false;
+        }
         self
     }
 
@@ -573,6 +591,400 @@ fn create_write_stdin_tool() -> ToolSpec {
             additional_properties: Some(false.into()),
         },
         output_schema: Some(unified_exec_output_schema()),
+    })
+}
+
+fn create_security_exec_tool() -> ToolSpec {
+    let properties = BTreeMap::from([
+        (
+            "cmd".to_string(),
+            JsonSchema::String {
+                description: Some(
+                    "Full shell command to execute for the security task. Pass the complete command with concrete targets and flags."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "workdir".to_string(),
+            JsonSchema::String {
+                description: Some(
+                    "Optional working directory to run the command in; defaults to the turn cwd."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "shell".to_string(),
+            JsonSchema::String {
+                description: Some("Shell binary to launch. Defaults to the user's default shell.".to_string()),
+            },
+        ),
+        (
+            "login".to_string(),
+            JsonSchema::Boolean {
+                description: Some(
+                    "Whether to run the shell with -l/-i semantics. Defaults to true.".to_string(),
+                ),
+            },
+        ),
+        (
+            "tty".to_string(),
+            JsonSchema::Boolean {
+                description: Some(
+                    "Whether to allocate a TTY for the command. Defaults to false (plain pipes).".to_string(),
+                ),
+            },
+        ),
+        (
+            "yield_time_ms".to_string(),
+            JsonSchema::Number {
+                description: Some(
+                    "How long to wait (in milliseconds) for output before yielding.".to_string(),
+                ),
+            },
+        ),
+        (
+            "max_output_tokens".to_string(),
+            JsonSchema::Number {
+                description: Some(
+                    "Maximum number of tokens to return. Excess output will be truncated."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "purpose".to_string(),
+            JsonSchema::String {
+                description: Some(
+                    "One concise sentence describing why this command is needed for the current assessment."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "scope_targets".to_string(),
+            JsonSchema::Array {
+                items: Box::new(JsonSchema::String { description: None }),
+                description: Some(
+                    "Explicit targets this command is intended to touch. Use URLs or hosts already in scope."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "risk_level".to_string(),
+            JsonSchema::String {
+                description: Some(
+                    "Optional risk classification for the command, such as low, medium, or high."
+                        .to_string(),
+                ),
+            },
+        ),
+        (
+            "expected_artifacts".to_string(),
+            JsonSchema::Array {
+                items: Box::new(JsonSchema::String { description: None }),
+                description: Some(
+                    "Optional file paths the command is expected to create so they can be captured as evidence."
+                        .to_string(),
+                ),
+            },
+        ),
+    ]);
+
+    ToolSpec::Function(ResponsesApiTool {
+        name: "security_exec".to_string(),
+        description:
+            "Run a fully specified security command through the managed terminal runtime after scope and risk checks. Use this for scanners and terminal-only tooling, not routine HTTP(S) requests that `http_inspect` can handle."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties,
+            required: Some(vec!["cmd".to_string(), "purpose".to_string()]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: Some(unified_exec_output_schema()),
+    })
+}
+
+fn create_scope_validate_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "scope_validate".to_string(),
+        description:
+            "Update or confirm the active security scope for this thread using explicit hosts, URLs, or wildcard domains."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "targets".to_string(),
+                    JsonSchema::Array {
+                        items: Box::new(JsonSchema::String { description: None }),
+                        description: Some(
+                            "Targets to allow, such as https://app.example.com or *.example.com."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "notes".to_string(),
+                    JsonSchema::String {
+                        description: Some("Optional scope note to persist with the thread.".to_string()),
+                    },
+                ),
+                (
+                    "replace".to_string(),
+                    JsonSchema::Boolean {
+                        description: Some(
+                            "When true, replace the existing scope instead of extending it.".to_string(),
+                        ),
+                    },
+                ),
+            ]),
+            required: Some(vec!["targets".to_string()]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
+    })
+}
+
+fn create_http_inspect_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "http_inspect".to_string(),
+        description:
+            "Inspect an in-scope HTTP endpoint, capture response metadata, and optionally save the response body as evidence. Prefer this over `security_exec` for HTTP(S) requests, replay, and redirect analysis."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "url".to_string(),
+                    JsonSchema::String {
+                        description: Some("Absolute in-scope URL to inspect.".to_string()),
+                    },
+                ),
+                (
+                    "method".to_string(),
+                    JsonSchema::String {
+                        description: Some("HTTP method to use. Defaults to GET.".to_string()),
+                    },
+                ),
+                (
+                    "headers".to_string(),
+                    JsonSchema::Object {
+                        properties: BTreeMap::new(),
+                        required: None,
+                        additional_properties: Some(true.into()),
+                    },
+                ),
+                (
+                    "body".to_string(),
+                    JsonSchema::String {
+                        description: Some("Optional request body.".to_string()),
+                    },
+                ),
+                (
+                    "capture_body".to_string(),
+                    JsonSchema::Boolean {
+                        description: Some(
+                            "When true, capture the response body into the evidence store.".to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "max_body_bytes".to_string(),
+                    JsonSchema::Number {
+                        description: Some(
+                            "Maximum number of response-body bytes to keep in memory for previewing."
+                                .to_string(),
+                        ),
+                    },
+                ),
+            ]),
+            required: Some(vec!["url".to_string()]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
+    })
+}
+
+fn create_capture_evidence_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "capture_evidence".to_string(),
+        description:
+            "Persist textual evidence or a generated file into the thread's evidence store."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "name".to_string(),
+                    JsonSchema::String {
+                        description: Some("Short label for the evidence record.".to_string()),
+                    },
+                ),
+                (
+                    "content".to_string(),
+                    JsonSchema::String {
+                        description: Some("Inline evidence content to persist.".to_string()),
+                    },
+                ),
+                (
+                    "source_path".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Absolute or cwd-relative path to a file that should be copied into evidence."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "notes".to_string(),
+                    JsonSchema::String {
+                        description: Some("Optional evidence note.".to_string()),
+                    },
+                ),
+                (
+                    "source".to_string(),
+                    JsonSchema::String {
+                        description: Some("Optional source URL or command label.".to_string()),
+                    },
+                ),
+                (
+                    "media_type".to_string(),
+                    JsonSchema::String {
+                        description: Some("Optional media type for the stored evidence.".to_string()),
+                    },
+                ),
+            ]),
+            required: Some(vec!["name".to_string()]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
+    })
+}
+
+fn create_record_finding_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "record_finding".to_string(),
+        description:
+            "Record a normalized security finding in the thread state for later reporting."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "target".to_string(),
+                    JsonSchema::String {
+                        description: Some("Affected URL, host, or endpoint.".to_string()),
+                    },
+                ),
+                (
+                    "vulnerability".to_string(),
+                    JsonSchema::String {
+                        description: Some("Vulnerability or issue name.".to_string()),
+                    },
+                ),
+                (
+                    "severity".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Severity rating, such as low, medium, high, or critical.".to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "confidence".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Confidence or reproduction status, such as confirmed or inconclusive."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "evidence".to_string(),
+                    JsonSchema::Array {
+                        items: Box::new(JsonSchema::String { description: None }),
+                        description: Some(
+                            "Evidence identifiers or paths supporting the finding.".to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "reproduction".to_string(),
+                    JsonSchema::String {
+                        description: Some("Concise reproduction details.".to_string()),
+                    },
+                ),
+                (
+                    "impact".to_string(),
+                    JsonSchema::String {
+                        description: Some("Concise impact statement.".to_string()),
+                    },
+                ),
+                (
+                    "limitations".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Any limitations or uncertainty that remain.".to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "status".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Finding status, such as confirmed, inconclusive, or not_found."
+                                .to_string(),
+                        ),
+                    },
+                ),
+            ]),
+            required: Some(vec![
+                "target".to_string(),
+                "vulnerability".to_string(),
+                "severity".to_string(),
+                "confidence".to_string(),
+            ]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
+    })
+}
+
+fn create_report_write_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "report_write".to_string(),
+        description:
+            "Write a deterministic Markdown report from the current security findings and evidence."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "summary".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "Optional summary paragraph to place at the top of the report."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "include_evidence".to_string(),
+                    JsonSchema::Boolean {
+                        description: Some(
+                            "When true, append an evidence section to the report.".to_string(),
+                        ),
+                    },
+                ),
+            ]),
+            required: None,
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
     })
 }
 
@@ -2043,9 +2455,11 @@ pub(crate) fn build_specs(
 ) -> ToolRegistryBuilder {
     use crate::tools::handlers::ApplyPatchHandler;
     use crate::tools::handlers::ArtifactsHandler;
+    use crate::tools::handlers::CaptureEvidenceHandler;
     use crate::tools::handlers::CodeModeHandler;
     use crate::tools::handlers::DynamicToolHandler;
     use crate::tools::handlers::GrepFilesHandler;
+    use crate::tools::handlers::HttpInspectHandler;
     use crate::tools::handlers::JsReplHandler;
     use crate::tools::handlers::JsReplResetHandler;
     use crate::tools::handlers::ListDirHandler;
@@ -2054,9 +2468,13 @@ pub(crate) fn build_specs(
     use crate::tools::handlers::MultiAgentHandler;
     use crate::tools::handlers::PlanHandler;
     use crate::tools::handlers::ReadFileHandler;
+    use crate::tools::handlers::RecordFindingHandler;
+    use crate::tools::handlers::ReportWriteHandler;
     use crate::tools::handlers::RequestPermissionsHandler;
     use crate::tools::handlers::RequestUserInputHandler;
+    use crate::tools::handlers::ScopeValidateHandler;
     use crate::tools::handlers::SearchToolBm25Handler;
+    use crate::tools::handlers::SecurityExecHandler;
     use crate::tools::handlers::ShellCommandHandler;
     use crate::tools::handlers::ShellHandler;
     use crate::tools::handlers::TestSyncHandler;
@@ -2085,6 +2503,12 @@ pub(crate) fn build_specs(
     let js_repl_reset_handler = Arc::new(JsReplResetHandler);
     let artifacts_handler = Arc::new(ArtifactsHandler);
     let request_permission_enabled = config.request_permission_enabled;
+    let security_exec_handler = Arc::new(SecurityExecHandler);
+    let scope_validate_handler = Arc::new(ScopeValidateHandler);
+    let http_inspect_handler = Arc::new(HttpInspectHandler);
+    let capture_evidence_handler = Arc::new(CaptureEvidenceHandler);
+    let record_finding_handler = Arc::new(RecordFindingHandler);
+    let report_write_handler = Arc::new(ReportWriteHandler);
 
     if config.code_mode_enabled {
         let nested_config = config.for_code_mode_nested_tools();
@@ -2112,53 +2536,105 @@ pub(crate) fn build_specs(
         builder.register_handler(PUBLIC_TOOL_NAME, code_mode_handler);
     }
 
-    match &config.shell_type {
-        ConfigShellToolType::Default => {
-            push_tool_spec(
-                &mut builder,
-                create_shell_tool(request_permission_enabled),
-                true,
-                config.code_mode_enabled,
-            );
-        }
-        ConfigShellToolType::Local => {
-            push_tool_spec(
-                &mut builder,
-                ToolSpec::LocalShell {},
-                true,
-                config.code_mode_enabled,
-            );
-        }
-        ConfigShellToolType::UnifiedExec => {
-            push_tool_spec(
-                &mut builder,
-                create_exec_command_tool(config.allow_login_shell, request_permission_enabled),
-                true,
-                config.code_mode_enabled,
-            );
-            push_tool_spec(
-                &mut builder,
-                create_write_stdin_tool(),
-                false,
-                config.code_mode_enabled,
-            );
-            builder.register_handler("exec_command", unified_exec_handler.clone());
-            builder.register_handler("write_stdin", unified_exec_handler);
-        }
-        ConfigShellToolType::Disabled => {
-            // Do nothing.
-        }
-        ConfigShellToolType::ShellCommand => {
-            push_tool_spec(
-                &mut builder,
-                create_shell_command_tool(config.allow_login_shell, request_permission_enabled),
-                true,
-                config.code_mode_enabled,
-            );
+    if config.security_mode {
+        push_tool_spec(
+            &mut builder,
+            create_security_exec_tool(),
+            true,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_write_stdin_tool(),
+            false,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_scope_validate_tool(),
+            false,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_http_inspect_tool(),
+            true,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_capture_evidence_tool(),
+            false,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_record_finding_tool(),
+            false,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
+            create_report_write_tool(),
+            false,
+            config.code_mode_enabled,
+        );
+        builder.register_handler("security_exec", security_exec_handler);
+        builder.register_handler("write_stdin", unified_exec_handler);
+        builder.register_handler("scope_validate", scope_validate_handler);
+        builder.register_handler("http_inspect", http_inspect_handler);
+        builder.register_handler("capture_evidence", capture_evidence_handler);
+        builder.register_handler("record_finding", record_finding_handler);
+        builder.register_handler("report_write", report_write_handler);
+    } else {
+        match &config.shell_type {
+            ConfigShellToolType::Default => {
+                push_tool_spec(
+                    &mut builder,
+                    create_shell_tool(request_permission_enabled),
+                    true,
+                    config.code_mode_enabled,
+                );
+            }
+            ConfigShellToolType::Local => {
+                push_tool_spec(
+                    &mut builder,
+                    ToolSpec::LocalShell {},
+                    true,
+                    config.code_mode_enabled,
+                );
+            }
+            ConfigShellToolType::UnifiedExec => {
+                push_tool_spec(
+                    &mut builder,
+                    create_exec_command_tool(config.allow_login_shell, request_permission_enabled),
+                    true,
+                    config.code_mode_enabled,
+                );
+                push_tool_spec(
+                    &mut builder,
+                    create_write_stdin_tool(),
+                    false,
+                    config.code_mode_enabled,
+                );
+                builder.register_handler("exec_command", unified_exec_handler.clone());
+                builder.register_handler("write_stdin", unified_exec_handler);
+            }
+            ConfigShellToolType::Disabled => {
+                // Do nothing.
+            }
+            ConfigShellToolType::ShellCommand => {
+                push_tool_spec(
+                    &mut builder,
+                    create_shell_command_tool(config.allow_login_shell, request_permission_enabled),
+                    true,
+                    config.code_mode_enabled,
+                );
+            }
         }
     }
 
-    if config.shell_type != ConfigShellToolType::Disabled {
+    if !config.security_mode && config.shell_type != ConfigShellToolType::Disabled {
         // Always register shell aliases so older prompts remain compatible.
         builder.register_handler("shell", shell_handler.clone());
         builder.register_handler("container.exec", shell_handler.clone());
@@ -2507,6 +2983,7 @@ mod tests {
     use crate::client_common::tools::FreeformTool;
     use crate::config::test_config;
     use crate::models_manager::manager::ModelsManager;
+    use crate::models_manager::model_info::model_info_from_slug;
     use crate::models_manager::model_info::with_config_overrides;
     use crate::tools::registry::ConfiguredToolSpec;
     use codex_protocol::openai_models::InputModality;
@@ -4660,5 +5137,51 @@ Examples of valid command strings:
                 },
             })]
         );
+    }
+
+    #[test]
+    fn security_mode_exposes_security_tools_and_hides_code_editing_tools() {
+        let model_info = ModelInfo {
+            experimental_supported_tools: vec![
+                "grep_files".to_string(),
+                "read_file".to_string(),
+                "list_dir".to_string(),
+            ],
+            ..model_info_from_slug("test-model")
+        };
+        let mut features = Features::with_defaults();
+        features.enable(Feature::UnifiedExec);
+        features.enable(Feature::CodeMode);
+        features.enable(Feature::JsRepl);
+        let available_models = Vec::new();
+        let tools_config = ToolsConfig::new(&ToolsConfigParams {
+            model_info: &model_info,
+            available_models: &available_models,
+            features: &features,
+            web_search_mode: Some(WebSearchMode::Disabled),
+            session_source: SessionSource::Cli,
+        })
+        .with_security_mode(true);
+
+        let (tools, _) = build_specs(&tools_config, None, None, &[]).build();
+
+        assert_contains_tool_names(
+            &tools,
+            &[
+                "security_exec",
+                "write_stdin",
+                "scope_validate",
+                "http_inspect",
+                "capture_evidence",
+                "record_finding",
+                "report_write",
+            ],
+        );
+        assert_lacks_tool_name(&tools, "apply_patch");
+        assert_lacks_tool_name(&tools, "js_repl");
+        assert_lacks_tool_name(&tools, "grep_files");
+        assert_lacks_tool_name(&tools, "read_file");
+        assert_lacks_tool_name(&tools, "list_dir");
+        assert_lacks_tool_name(&tools, PUBLIC_TOOL_NAME);
     }
 }

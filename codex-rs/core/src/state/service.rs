@@ -13,6 +13,7 @@ use crate::mcp::McpManager;
 use crate::mcp_connection_manager::McpConnectionManager;
 use crate::models_manager::manager::ModelsManager;
 use crate::plugins::PluginsManager;
+use crate::security::SecuritySessionStateService;
 use crate::skills::SkillsManager;
 use crate::state_db::StateDbHandle;
 use crate::tools::network_approval::NetworkApprovalService;
@@ -83,4 +84,5 @@ pub(crate) struct SessionServices {
     /// Session-scoped model client shared across turns.
     pub(crate) model_client: ModelClient,
     pub(crate) code_mode_store: CodeModeStoreService,
+    pub(crate) security_state: Arc<SecuritySessionStateService>,
 }

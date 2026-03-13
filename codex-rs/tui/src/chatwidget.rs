@@ -415,7 +415,7 @@ impl RateLimitWarningState {
                     .unwrap_or_else(|| "weekly".to_string());
                 let remaining_percent = 100.0 - threshold;
                 warnings.push(format!(
-                    "Heads up, you have less than {remaining_percent:.0}% of your {limit_label} limit left. Run /status for a breakdown."
+                    "Heads up, you have less than {remaining_percent:.0}% of your {limit_label} limit left. Check session details for a breakdown."
                 ));
             }
         }
@@ -434,7 +434,7 @@ impl RateLimitWarningState {
                     .unwrap_or_else(|| "5h".to_string());
                 let remaining_percent = 100.0 - threshold;
                 warnings.push(format!(
-                    "Heads up, you have less than {remaining_percent:.0}% of your {limit_label} limit left. Run /status for a breakdown."
+                    "Heads up, you have less than {remaining_percent:.0}% of your {limit_label} limit left. Check session details for a breakdown."
                 ));
             }
         }
@@ -1951,7 +1951,7 @@ impl ChatWidget {
         self.finalize_turn();
 
         let message = if message.trim().is_empty() {
-            "Codex is currently experiencing high load.".to_string()
+            "Uxarion is currently experiencing high load.".to_string()
         } else {
             message
         };
@@ -4013,6 +4013,9 @@ impl ChatWidget {
             SlashCommand::Model => {
                 self.open_model_popup();
             }
+            SlashCommand::ApiKey => {
+                self.show_api_key_prompt();
+            }
             SlashCommand::Fast => {
                 let next_tier = if matches!(self.config.service_tier, Some(ServiceTier::Fast)) {
                     None
@@ -4166,7 +4169,7 @@ impl ChatWidget {
             SlashCommand::Copy => {
                 let Some(text) = self.last_copyable_output.as_deref() else {
                     self.add_info_message(
-                        "`/copy` is unavailable before the first Codex output or right after a rollback."
+                        "`/copy` is unavailable before the first Uxarion output or right after a rollback."
                             .to_string(),
                         None,
                     );
@@ -4182,7 +4185,7 @@ impl ChatWidget {
                                 .to_string(),
                         );
                         self.add_info_message(
-                            "Copied latest Codex output to clipboard.".to_string(),
+                            "Copied latest Uxarion output to clipboard.".to_string(),
                             hint,
                         );
                     }
@@ -4322,6 +4325,22 @@ impl ChatWidget {
                     }
                 }
             }
+            SlashCommand::ApiKey if !trimmed.is_empty() => {
+                let Some((prepared_args, _prepared_elements)) =
+                    self.bottom_pane.prepare_inline_args_submission(false)
+                else {
+                    return;
+                };
+                Self::persist_api_key(
+                    self.app_event_tx.clone(),
+                    self.auth_manager.clone(),
+                    self.config.codex_home.clone(),
+                    self.config.cli_auth_credentials_store_mode,
+                    prepared_args,
+                    codex_core::auth::read_openai_api_key_from_env().is_some(),
+                );
+                self.bottom_pane.drain_pending_submission_state();
+            }
             SlashCommand::Rename if !trimmed.is_empty() => {
                 self.session_telemetry
                     .counter("codex.thread.rename", 1, &[]);
@@ -4433,6 +4452,89 @@ impl ChatWidget {
         );
 
         self.bottom_pane.show_view(Box::new(view));
+    }
+
+    fn show_api_key_prompt(&mut self) {
+        let has_saved_api_key = matches!(
+            self.auth_manager.auth_mode(),
+            Some(codex_core::auth::AuthMode::ApiKey)
+        );
+        let env_api_key_present = codex_core::auth::read_openai_api_key_from_env().is_some();
+        let context_label = if env_api_key_present {
+            Some("OPENAI_API_KEY is set in this session".to_string())
+        } else if has_saved_api_key {
+            Some("The current saved key will be replaced".to_string())
+        } else {
+            None
+        };
+        let title = if has_saved_api_key {
+            "Replace saved API key"
+        } else {
+            "Save API key"
+        };
+        let tx = self.app_event_tx.clone();
+        let auth_manager = self.auth_manager.clone();
+        let codex_home = self.config.codex_home.clone();
+        let auth_credentials_store_mode = self.config.cli_auth_credentials_store_mode;
+        let view = CustomPromptView::new(
+            title.to_string(),
+            "Paste your API key and press Enter".to_string(),
+            context_label,
+            Box::new(move |api_key: String| {
+                Self::persist_api_key(
+                    tx.clone(),
+                    auth_manager.clone(),
+                    codex_home.clone(),
+                    auth_credentials_store_mode,
+                    api_key,
+                    env_api_key_present,
+                );
+            }),
+        );
+
+        self.bottom_pane.show_view(Box::new(view));
+    }
+
+    fn persist_api_key(
+        app_event_tx: AppEventSender,
+        auth_manager: Arc<AuthManager>,
+        codex_home: PathBuf,
+        auth_credentials_store_mode: codex_core::auth::AuthCredentialsStoreMode,
+        api_key: String,
+        env_api_key_present: bool,
+    ) {
+        let api_key = api_key.trim().to_string();
+        if api_key.is_empty() {
+            app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                history_cell::new_error_event("API key cannot be empty.".to_string()),
+            )));
+            return;
+        }
+
+        match codex_core::auth::login_with_api_key(
+            &codex_home,
+            &api_key,
+            auth_credentials_store_mode,
+        ) {
+            Ok(()) => {
+                auth_manager.reload();
+                let hint = env_api_key_present.then(|| {
+                    "OPENAI_API_KEY is set for this session, so the environment value will keep taking precedence until Uxarion is restarted without it."
+                        .to_string()
+                });
+                app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                    history_cell::new_info_event(
+                        "Saved API key to Uxarion credential storage.".to_string(),
+                        hint,
+                    ),
+                )));
+            }
+            Err(err) => {
+                app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                    history_cell::new_error_event(format!("Failed to save API key: {err}")),
+                )));
+            }
+        }
     }
 
     pub(crate) fn handle_paste(&mut self, text: String) {
@@ -5949,7 +6051,9 @@ impl ChatWidget {
 
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Select Personality".bold()));
-        header.push(Line::from("Choose a communication style for Codex.".dim()));
+        header.push(Line::from(
+            "Choose a communication style for Uxarion.".dim(),
+        ));
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
             header: Box::new(header),
@@ -5985,7 +6089,7 @@ impl ChatWidget {
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
             title: Some("Settings".to_string()),
-            subtitle: Some("Configure settings for Codex.".to_string()),
+            subtitle: Some("Configure settings for Uxarion.".to_string()),
             footer_hint: Some(standard_popup_hint_line()),
             items,
             ..Default::default()
@@ -6905,7 +7009,7 @@ impl ChatWidget {
         let mut header_children: Vec<Box<dyn Renderable>> = Vec::new();
         let title_line = Line::from("Enable full access?").bold();
         let info_line = Line::from(vec![
-            "When Codex runs with full access, it can edit any file on your computer and run commands with network, without your approval. "
+            "When Uxarion runs with full access, it can edit any file on your computer and run commands with network, without your approval. "
                 .into(),
             "Exercise caution when enabling full access. This significantly increases the risk of data loss, leaks, or unexpected behavior."
                 .fg(Color::Red),
@@ -8823,7 +8927,7 @@ impl Notification {
             }
             Notification::EditApprovalRequested { cwd, changes } => {
                 format!(
-                    "Codex wants to edit {}",
+                    "Uxarion wants to edit {}",
                     if changes.len() == 1 {
                         #[allow(clippy::unwrap_used)]
                         display_path_for(changes.first().unwrap(), cwd)
@@ -8914,14 +9018,14 @@ impl Notification {
 const AGENT_NOTIFICATION_PREVIEW_GRAPHEMES: usize = 200;
 
 const PLACEHOLDERS: [&str; 8] = [
-    "Explain this codebase",
-    "Summarize recent commits",
-    "Implement {feature}",
-    "Find and fix a bug in @filename",
-    "Write tests for @filename",
-    "Improve documentation in @filename",
-    "Run /review on my current changes",
-    "Use /skills to list available skills",
+    "Inspect this target for reflected XSS",
+    "Check this login flow for SQL injection",
+    "Map the attack surface of this web app",
+    "Probe this endpoint for IDOR",
+    "Review the response headers for security issues",
+    "Enumerate forms and inputs on this page",
+    "Confirm whether this redirect is open or blocked",
+    "Scan 127.0.0.1 for open ports",
 ];
 
 // Extract the first bold (Markdown) element in the form **...** from `s`.

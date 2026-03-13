@@ -6306,6 +6306,65 @@ async fn custom_prompt_enter_empty_does_not_send() {
 }
 
 #[tokio::test]
+async fn api_key_prompt_popup_snapshot() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+
+    chat.dispatch_command(SlashCommand::ApiKey);
+
+    let popup = render_bottom_popup(&chat, 80);
+    assert_snapshot!("api_key_prompt_popup", popup);
+}
+
+#[tokio::test]
+async fn api_key_prompt_persists_key_and_updates_auth_manager() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(None).await;
+    let codex_home = tempdir().unwrap();
+    chat.config.codex_home = codex_home.path().to_path_buf();
+    chat.auth_manager = codex_core::test_support::auth_manager_from_auth_with_home(
+        CodexAuth::from_api_key("sk-old"),
+        chat.config.codex_home.clone(),
+    );
+
+    chat.dispatch_command(SlashCommand::ApiKey);
+    chat.handle_paste("  sk-new  ".to_string());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    let event = rx.try_recv().expect("expected history update");
+    match event {
+        AppEvent::InsertHistoryCell(cell) => {
+            let rendered = lines_to_single_string(&cell.display_lines(80));
+            assert!(
+                rendered.contains("Saved API key to Uxarion credential storage."),
+                "expected API-key success message, got {rendered:?}"
+            );
+        }
+        other => panic!("expected history update, got {other:?}"),
+    }
+
+    let saved_auth = codex_core::auth::load_auth_dot_json(
+        &chat.config.codex_home,
+        chat.config.cli_auth_credentials_store_mode,
+    )
+    .expect("auth should load");
+    assert_eq!(
+        saved_auth,
+        Some(codex_core::auth::AuthDotJson {
+            auth_mode: Some(codex_app_server_protocol::AuthMode::ApiKey),
+            openai_api_key: Some("sk-new".to_string()),
+            tokens: None,
+            last_refresh: None,
+        })
+    );
+    let cached_token = chat
+        .auth_manager
+        .auth_cached()
+        .expect("auth should be cached")
+        .get_token()
+        .expect("cached auth should expose API key");
+    assert_eq!(cached_token, "sk-new".to_string());
+}
+
+#[tokio::test]
 async fn view_image_tool_call_adds_history_cell() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(None).await;
     let image_path = chat.config.cwd.join("example.png");

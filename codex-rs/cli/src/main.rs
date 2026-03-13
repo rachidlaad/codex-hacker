@@ -52,7 +52,7 @@ use codex_core::features::Stage;
 use codex_core::features::is_known_feature_key;
 use codex_core::terminal::TerminalName;
 
-/// Codex CLI
+/// Uxarion CLI
 ///
 /// If no subcommand is specified, options will be forwarded to the interactive CLI.
 #[derive(Debug, Parser)]
@@ -62,10 +62,10 @@ use codex_core::terminal::TerminalName;
     // If a sub‑command is given, ignore requirements of the default args.
     subcommand_negates_reqs = true,
     // The executable is sometimes invoked via a platform‑specific name like
-    // `codex-x86_64-unknown-linux-musl`, but the help output should always use
-    // the generic `codex` command name that users run.
-    bin_name = "codex",
-    override_usage = "codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]"
+    // `uxarion-x86_64-unknown-linux-musl`, but the help output should always use
+    // the generic `uxarion` command name that users run.
+    bin_name = "uxarion",
+    override_usage = "uxarion [OPTIONS] [PROMPT]\n       uxarion [OPTIONS] <COMMAND> [ARGS]"
 )]
 struct MultitoolCli {
     #[clap(flatten)]
@@ -83,46 +83,56 @@ struct MultitoolCli {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    /// Run Codex non-interactively.
+    /// Run Uxarion non-interactively.
     #[clap(visible_alias = "e")]
     Exec(ExecCli),
 
     /// Run a code review non-interactively.
+    #[clap(hide = true)]
     Review(ReviewArgs),
 
     /// Manage login.
+    #[clap(hide = true)]
     Login(LoginCommand),
 
     /// Remove stored authentication credentials.
+    #[clap(hide = true)]
     Logout(LogoutCommand),
 
-    /// Manage external MCP servers for Codex.
+    /// Manage external MCP servers for Uxarion.
+    #[clap(hide = true)]
     Mcp(McpCli),
 
-    /// Start Codex as an MCP server (stdio).
+    /// Start Uxarion as an MCP server (stdio).
+    #[clap(hide = true)]
     McpServer,
 
     /// [experimental] Run the app server or related tooling.
+    #[clap(hide = true)]
     AppServer(AppServerCommand),
 
-    /// Launch the Codex desktop app (downloads the macOS installer if missing).
+    /// Launch the Uxarion desktop app (downloads the macOS installer if missing).
     #[cfg(target_os = "macos")]
+    #[clap(hide = true)]
     App(app_cmd::AppCommand),
 
     /// Generate shell completion scripts.
     Completion(CompletionCommand),
 
-    /// Run commands within a Codex-provided sandbox.
+    /// Run commands within a Uxarion-provided sandbox.
+    #[clap(hide = true)]
     Sandbox(SandboxArgs),
 
     /// Debugging tools.
+    #[clap(hide = true)]
     Debug(DebugCommand),
 
     /// Execpolicy tooling.
     #[clap(hide = true)]
     Execpolicy(ExecpolicyCommand),
 
-    /// Apply the latest diff produced by Codex agent as a `git apply` to your local working tree.
+    /// Apply the latest diff produced by the agent as a `git apply` to your local working tree.
+    #[clap(hide = true)]
     #[clap(visible_alias = "a")]
     Apply(ApplyCommand),
 
@@ -132,7 +142,8 @@ enum Subcommand {
     /// Fork a previous interactive session (picker by default; use --last to fork the most recent).
     Fork(ForkCommand),
 
-    /// [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally.
+    /// [EXPERIMENTAL] Browse tasks from Uxarion Cloud and apply changes locally.
+    #[clap(hide = true)]
     #[clap(name = "cloud", alias = "cloud-tasks")]
     Cloud(CloudTasksCli),
 
@@ -145,6 +156,7 @@ enum Subcommand {
     StdioToUds(StdioToUdsCommand),
 
     /// Inspect feature flags.
+    #[clap(hide = true)]
     Features(FeaturesCli),
 }
 
@@ -1090,7 +1102,7 @@ fn merge_interactive_cli_flags(interactive: &mut TuiCli, subcommand_cli: TuiCli)
 
 fn print_completion(cmd: CompletionCommand) {
     let mut app = MultitoolCli::command();
-    let name = "codex";
+    let name = "uxarion";
     generate(cmd.shell, &mut app, name, &mut std::io::stdout());
 }
 

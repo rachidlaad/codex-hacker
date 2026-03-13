@@ -41,6 +41,7 @@ use crate::realtime_conversation::handle_close as handle_realtime_conversation_c
 use crate::realtime_conversation::handle_start as handle_realtime_conversation_start;
 use crate::realtime_conversation::handle_text as handle_realtime_conversation_text;
 use crate::rollout::session_index;
+use crate::security;
 use crate::stream_events_utils::HandleOutputCtx;
 use crate::stream_events_utils::handle_non_tool_response_item;
 use crate::stream_events_utils::handle_output_item_done;
@@ -418,6 +419,8 @@ impl Codex {
             config.startup_warnings.push(message);
         }
 
+        security::apply_runtime_overrides(&mut config);
+
         let allowed_skills_for_implicit_invocation =
             loaded_skills.allowed_skills_for_implicit_invocation();
         let user_instructions = get_user_instructions(
@@ -786,6 +789,7 @@ impl TurnContext {
         })
         .with_web_search_config(self.tools_config.web_search_config.clone())
         .with_allow_login_shell(self.tools_config.allow_login_shell)
+        .with_security_mode(self.tools_config.security_mode)
         .with_agent_roles(config.agent_roles.clone());
 
         Self {
@@ -1196,6 +1200,7 @@ impl Session {
         })
         .with_web_search_config(per_turn_config.web_search_config.clone())
         .with_allow_login_shell(per_turn_config.permissions.allow_login_shell)
+        .with_security_mode(security::is_security_config(per_turn_config.as_ref()))
         .with_agent_roles(per_turn_config.agent_roles.clone());
 
         let cwd = session_configuration.cwd.clone();
@@ -1652,6 +1657,14 @@ impl Session {
                 Self::build_model_client_beta_features_header(config.as_ref()),
             ),
             code_mode_store: Default::default(),
+            security_state: Arc::new(
+                security::SecuritySessionStateService::new(
+                    &config.codex_home,
+                    &conversation_id,
+                    security::is_security_config(config.as_ref()),
+                )
+                .await,
+            ),
         };
         let js_repl = Arc::new(JsReplHandle::with_node_path(
             config.js_repl_node_path.clone(),
@@ -3389,8 +3402,9 @@ impl Session {
         {
             developer_sections.push(memory_prompt);
         }
-        // Add developer instructions from collaboration_mode if they exist and are non-empty
-        if let Some(collab_instructions) =
+        if turn_context.tools_config.security_mode {
+            developer_sections.push(security::collaboration_instructions().to_string());
+        } else if let Some(collab_instructions) =
             DeveloperInstructions::from_collaboration_mode(&collaboration_mode)
         {
             developer_sections.push(collab_instructions.into_text());
@@ -3450,6 +3464,30 @@ impl Session {
                 .with_subagents(subagents)
                 .serialize_to_xml(),
         );
+        if turn_context.tools_config.security_mode {
+            let history = self.clone_history().await;
+            if let Some(security_context) = self
+                .services
+                .security_state
+                .render_context_fragment(history.raw_items())
+                .await
+            {
+                contextual_user_sections.push(
+                    crate::contextual_user_message::SECURITY_CONTEXT_FRAGMENT
+                        .wrap(security_context),
+                );
+            }
+            if let Some(tool_inventory) = self
+                .services
+                .security_state
+                .render_tool_inventory_fragment()
+            {
+                contextual_user_sections.push(
+                    crate::contextual_user_message::SECURITY_TOOL_INVENTORY_FRAGMENT
+                        .wrap(tool_inventory),
+                );
+            }
+        }
 
         let mut items = Vec::with_capacity(2);
         if let Some(developer_message) =
@@ -5153,6 +5191,7 @@ async fn spawn_review_thread(
     })
     .with_web_search_config(None)
     .with_allow_login_shell(config.permissions.allow_login_shell)
+    .with_security_mode(parent_turn_context.tools_config.security_mode)
     .with_agent_roles(config.agent_roles.clone());
 
     let review_prompt = resolved.prompt.clone();
@@ -5364,6 +5403,13 @@ pub(crate) async fn run_turn(
     }
 
     let skills_outcome = Some(turn_context.turn_skills.outcome.as_ref());
+
+    if turn_context.tools_config.security_mode {
+        sess.services
+            .security_state
+            .ensure_default_scope_from_user_input(&input)
+            .await;
+    }
 
     sess.record_context_updates_and_set_reference_context_item(turn_context.as_ref())
         .await;

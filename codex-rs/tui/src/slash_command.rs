@@ -13,6 +13,8 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
+    #[strum(serialize = "apikey")]
+    ApiKey,
     Fast,
     Approvals,
     Permissions,
@@ -68,19 +70,19 @@ impl SlashCommand {
         match self {
             SlashCommand::Feedback => "send logs to maintainers",
             SlashCommand::New => "start a new chat during a conversation",
-            SlashCommand::Init => "create an AGENTS.md file with instructions for Codex",
+            SlashCommand::Init => "create an AGENTS.md file with instructions for Uxarion",
             SlashCommand::Compact => "summarize conversation to prevent hitting the context limit",
             SlashCommand::Review => "review my current changes and find issues",
             SlashCommand::Rename => "rename the current thread",
             SlashCommand::Resume => "resume a saved chat",
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
-            // SlashCommand::Undo => "ask Codex to undo a turn",
-            SlashCommand::Quit | SlashCommand::Exit => "exit Codex",
+            // SlashCommand::Undo => "ask Uxarion to undo a turn",
+            SlashCommand::Quit | SlashCommand::Exit => "exit Uxarion",
             SlashCommand::Diff => "show git diff (including untracked files)",
-            SlashCommand::Copy => "copy the latest Codex output to your clipboard",
+            SlashCommand::Copy => "copy the latest Uxarion output to your clipboard",
             SlashCommand::Mention => "mention a file",
-            SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
+            SlashCommand::Skills => "use skills to improve how Uxarion performs specific tasks",
             SlashCommand::Status => "show current session configuration and token usage",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
             SlashCommand::Statusline => "configure which items appear in the status line",
@@ -90,15 +92,16 @@ impl SlashCommand {
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose what model and reasoning effort to use",
+            SlashCommand::ApiKey => "set or replace the saved API key",
             SlashCommand::Fast => "toggle Fast mode to enable fastest inference at 2X plan usage",
-            SlashCommand::Personality => "choose a communication style for Codex",
+            SlashCommand::Personality => "choose a communication style for Uxarion",
             SlashCommand::Realtime => "toggle realtime voice mode (experimental)",
             SlashCommand::Settings => "configure realtime microphone/speaker",
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Collab => "change collaboration mode (experimental)",
             SlashCommand::Agent | SlashCommand::MultiAgents => "switch the active agent thread",
-            SlashCommand::Approvals => "choose what Codex is allowed to do",
-            SlashCommand::Permissions => "choose what Codex is allowed to do",
+            SlashCommand::Approvals => "choose what Uxarion is allowed to do",
+            SlashCommand::Permissions => "choose what Uxarion is allowed to do",
             SlashCommand::ElevateSandbox => "set up elevated agent sandbox",
             SlashCommand::SandboxReadRoot => {
                 "let sandbox read a directory: /sandbox-add-read-dir <absolute_path>"
@@ -106,7 +109,7 @@ impl SlashCommand {
             SlashCommand::Experimental => "toggle experimental features",
             SlashCommand::Mcp => "list configured MCP tools",
             SlashCommand::Apps => "manage apps",
-            SlashCommand::Logout => "log out of Codex",
+            SlashCommand::Logout => "log out of Uxarion",
             SlashCommand::Rollout => "print the rollout file path",
             SlashCommand::TestApproval => "test approval request",
         }
@@ -125,6 +128,7 @@ impl SlashCommand {
             SlashCommand::Review
                 | SlashCommand::Rename
                 | SlashCommand::Plan
+                | SlashCommand::ApiKey
                 | SlashCommand::Fast
                 | SlashCommand::SandboxReadRoot
         )
@@ -140,6 +144,7 @@ impl SlashCommand {
             | SlashCommand::Compact
             // | SlashCommand::Undo
             | SlashCommand::Model
+            | SlashCommand::ApiKey
             | SlashCommand::Fast
             | SlashCommand::Personality
             | SlashCommand::Approvals
@@ -179,10 +184,41 @@ impl SlashCommand {
     }
 
     fn is_visible(self) -> bool {
+        let hidden_in_security_ui = matches!(
+            self,
+            SlashCommand::Init
+                | SlashCommand::Skills
+                | SlashCommand::Review
+                | SlashCommand::Rename
+                | SlashCommand::Plan
+                | SlashCommand::Collab
+                | SlashCommand::Agent
+                | SlashCommand::MultiAgents
+                | SlashCommand::Diff
+                | SlashCommand::Mention
+                | SlashCommand::Status
+                | SlashCommand::DebugConfig
+                | SlashCommand::Statusline
+                | SlashCommand::Theme
+                | SlashCommand::Mcp
+                | SlashCommand::Apps
+                | SlashCommand::Logout
+                | SlashCommand::Feedback
+                | SlashCommand::Experimental
+                | SlashCommand::ElevateSandbox
+                | SlashCommand::SandboxReadRoot
+                | SlashCommand::Rollout
+                | SlashCommand::TestApproval
+                | SlashCommand::Realtime
+                | SlashCommand::Settings
+        );
+
+        if hidden_in_security_ui {
+            return false;
+        }
+
         match self {
-            SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
             SlashCommand::Copy => !cfg!(target_os = "android"),
-            SlashCommand::Rollout | SlashCommand::TestApproval => cfg!(debug_assertions),
             _ => true,
         }
     }
