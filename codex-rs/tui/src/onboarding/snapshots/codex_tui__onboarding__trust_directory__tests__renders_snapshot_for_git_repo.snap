@@ -3,12 +3,13 @@ source: tui/src/onboarding/trust_directory.rs
 assertion_line: 218
 expression: terminal.backend()
 ---
-> You are in /workspace/project
+> Current workspace: /workspace/project
 
-  Do you trust the contents of this directory? Working with untrusted
-  contents comes with higher risk of prompt injection.
+  Allow Uxarion to operate in this workspace? Local files and
+  instructions here can influence prompts, commands, and scan
+  behavior.
 
-› 1. Yes, continue                                                    
-  2. No, quit
+› 1. Trust this workspace                                             
+  2. Quit
 
   Press enter to continue
