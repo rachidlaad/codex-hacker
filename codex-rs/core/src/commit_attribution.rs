@@ -1,4 +1,4 @@
-const DEFAULT_ATTRIBUTION_VALUE: &str = "Codex <noreply@openai.com>";
+const DEFAULT_ATTRIBUTION_VALUE: &str = "Uxarion <noreply@uxarion.local>";
 
 fn build_commit_message_trailer(config_attribution: Option<&str>) -> Option<String> {
     let value = resolve_attribution_value(config_attribution)?;
@@ -41,10 +41,10 @@ mod tests {
     }
 
     #[test]
-    fn default_attribution_uses_codex_trailer() {
+    fn default_attribution_uses_uxarion_trailer() {
         assert_eq!(
             build_commit_message_trailer(None).as_deref(),
-            Some("Co-authored-by: Codex <noreply@openai.com>")
+            Some("Co-authored-by: Uxarion <noreply@uxarion.local>")
         );
     }
 
@@ -52,7 +52,7 @@ mod tests {
     fn resolve_value_handles_default_custom_and_blank() {
         assert_eq!(
             resolve_attribution_value(None),
-            Some("Codex <noreply@openai.com>".to_string())
+            Some("Uxarion <noreply@uxarion.local>".to_string())
         );
         assert_eq!(
             resolve_attribution_value(Some("MyAgent <me@example.com>")),

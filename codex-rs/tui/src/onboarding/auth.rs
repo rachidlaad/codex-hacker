@@ -294,7 +294,7 @@ impl AuthModeWidget {
         let mut lines: Vec<Line> = vec![
             Line::from(vec![
                 "  ".into(),
-                "Sign in with ChatGPT to use Codex as part of your paid plan".into(),
+                "Sign in with ChatGPT to use Uxarion as part of your paid plan".into(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -444,14 +444,12 @@ impl AuthModeWidget {
             "".into(),
             "  Before you start:".into(),
             "".into(),
-            "  Decide how much autonomy you want to grant Codex".into(),
-            Line::from(vec![
-                "  For more details see the ".into(),
-                "\u{1b}]8;;https://developers.openai.com/codex/security\u{7}Codex docs\u{1b}]8;;\u{7}".underlined(),
-            ])
-            .dim(),
+            "  Decide how much autonomy you want to grant Uxarion".into(),
+            "  Review your local security guidance before enabling broad access."
+                .dim()
+                .into(),
             "".into(),
-            "  Codex can make mistakes".into(),
+            "  Uxarion can make mistakes".into(),
             "  Review the code it writes and commands it runs".dim().into(),
             "".into(),
             "  Powered by your ChatGPT account".into(),
@@ -485,7 +483,7 @@ impl AuthModeWidget {
         let lines = vec![
             "✓ API key configured".fg(Color::Green).into(),
             "".into(),
-            "  Codex will use usage-based billing with your API key.".into(),
+            "  Uxarion will use usage-based billing with your API key.".into(),
         ];
 
         Paragraph::new(lines)
@@ -504,14 +502,14 @@ impl AuthModeWidget {
         let mut intro_lines: Vec<Line> = vec![
             Line::from(vec![
                 "> ".into(),
-                "Use your own OpenAI API key for usage-based billing".bold(),
+                "Use your own API key for usage-based billing".bold(),
             ]),
             "".into(),
             "  Paste or type your API key below. It will be stored locally in auth.json.".into(),
             "".into(),
         ];
         if state.prepopulated_from_env {
-            intro_lines.push("  Detected OPENAI_API_KEY environment variable.".into());
+            intro_lines.push("  Detected an API key in your environment.".into());
             intro_lines.push(
                 "  Paste a different key if you prefer to use another account."
                     .dim()

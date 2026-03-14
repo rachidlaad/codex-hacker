@@ -29,10 +29,8 @@ use super::popup_consts::standard_popup_hint_line;
 use super::textarea::TextArea;
 use super::textarea::TextAreaState;
 
-const BASE_CLI_BUG_ISSUE_URL: &str =
-    "https://github.com/openai/codex/issues/new?template=3-cli.yml";
 /// Internal routing link for employee feedback follow-ups. This must not be shown to external users.
-const CODEX_FEEDBACK_INTERNAL_URL: &str = "http://go/codex-feedback-internal";
+const CODEX_FEEDBACK_INTERNAL_URL: &str = "http://go/uxarion-feedback-internal";
 
 /// The target audience for feedback follow-up instructions.
 ///
@@ -118,7 +116,7 @@ impl FeedbackNoteView {
                     issue_url_for_category(self.category, &thread_id, self.feedback_audience);
                 let mut lines = vec![Line::from(match issue_url.as_ref() {
                     Some(_) if self.feedback_audience == FeedbackAudience::OpenAiEmployee => {
-                        format!("{prefix} Please report this in #codex-feedback:")
+                        format!("{prefix} Please report this in #uxarion-feedback:")
                     }
                     Some(_) => format!("{prefix} Please open an issue using the following URL:"),
                     None => format!("{prefix} Thanks for the feedback!"),
@@ -132,7 +130,7 @@ impl FeedbackNoteView {
                             Line::from("  Share this and add some info about your problem:"),
                             Line::from(vec![
                                 "    ".into(),
-                                format!("https://go/codex-feedback/{thread_id}").bold(),
+                                format!("https://go/uxarion-feedback/{thread_id}").bold(),
                             ]),
                         ]);
                     }
@@ -397,19 +395,16 @@ fn issue_url_for_category(
     thread_id: &str,
     feedback_audience: FeedbackAudience,
 ) -> Option<String> {
-    // Only certain categories provide a follow-up link. We intentionally keep
-    // the external GitHub behavior identical while routing internal users to
-    // the internal go link.
+    // Only internal users get a follow-up link in this fork; external users
+    // keep the thread id and can route reports however they prefer.
     match category {
         FeedbackCategory::Bug
         | FeedbackCategory::BadResult
         | FeedbackCategory::SafetyCheck
-        | FeedbackCategory::Other => Some(match feedback_audience {
-            FeedbackAudience::OpenAiEmployee => slack_feedback_url(thread_id),
-            FeedbackAudience::External => {
-                format!("{BASE_CLI_BUG_ISSUE_URL}&steps=Uploaded%20thread:%20{thread_id}")
-            }
-        }),
+        | FeedbackCategory::Other => match feedback_audience {
+            FeedbackAudience::OpenAiEmployee => Some(slack_feedback_url(thread_id)),
+            FeedbackAudience::External => None,
+        },
         FeedbackCategory::GoodResult => None,
     }
 }
@@ -566,7 +561,7 @@ pub(crate) fn feedback_upload_consent_params(
             super::SelectionItem {
                 name: "Yes".to_string(),
                 description: Some(
-                    "Share the current Codex session logs with the team for troubleshooting."
+                    "Share the current Uxarion session logs with the team for troubleshooting."
                         .to_string(),
                 ),
                 actions: vec![yes_action],
@@ -737,7 +732,7 @@ mod tests {
             "thread-1",
             FeedbackAudience::OpenAiEmployee,
         );
-        let expected_slack_url = "http://go/codex-feedback-internal".to_string();
+        let expected_slack_url = "http://go/uxarion-feedback-internal".to_string();
         assert_eq!(bug_url.as_deref(), Some(expected_slack_url.as_str()));
 
         let bad_result_url = issue_url_for_category(
@@ -771,7 +766,6 @@ mod tests {
         );
         let bug_url_non_employee =
             issue_url_for_category(FeedbackCategory::Bug, "t", FeedbackAudience::External);
-        let expected_external_url = "https://github.com/openai/codex/issues/new?template=3-cli.yml&steps=Uploaded%20thread:%20t";
-        assert_eq!(bug_url_non_employee.as_deref(), Some(expected_external_url));
+        assert_eq!(bug_url_non_employee, None);
     }
 }

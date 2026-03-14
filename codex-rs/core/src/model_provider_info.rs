@@ -1,7 +1,7 @@
-//! Registry of model providers supported by Codex.
+//! Registry of model providers supported by Uxarion.
 //!
 //! Providers can be defined in two places:
-//!   1. Built-in defaults compiled into the binary so Codex works out-of-the-box.
+//!   1. Built-in defaults compiled into the binary so Uxarion works out-of-the-box.
 //!   2. User-defined entries inside `~/.codex/config.toml` under the `model_providers`
 //!      key. These override or extend the defaults at runtime.
 
@@ -26,7 +26,7 @@ const MAX_STREAM_MAX_RETRIES: u64 = 100;
 /// Hard cap for user-configured `request_max_retries`.
 const MAX_REQUEST_MAX_RETRIES: u64 = 100;
 
-const OPENAI_PROVIDER_NAME: &str = "OpenAI";
+const OPENAI_PROVIDER_NAME: &str = "Uxarion API";
 const PENTEST_LOCAL_PROVIDER_NAME: &str = "Pentest Local";
 const CHAT_WIRE_API_REMOVED_ERROR: &str = "`wire_api = \"chat\"` is no longer supported.\nHow to fix: set `wire_api = \"responses\"` in your provider config.\nMore info: https://github.com/openai/codex/discussions/7782";
 pub(crate) const LEGACY_OLLAMA_CHAT_PROVIDER_ID: &str = "ollama-chat";
@@ -274,7 +274,7 @@ pub fn built_in_model_providers() -> HashMap<String, ModelProviderInfo> {
     use ModelProviderInfo as P;
 
     // We do not want to be in the business of adjucating which third-party
-    // providers are bundled with Codex CLI, so we only include the OpenAI and
+    // providers are bundled with Uxarion CLI, so we only include the primary and
     // open source ("oss") providers by default. Users are encouraged to add to
     // `model_providers` in config.toml to add their own providers.
     [
@@ -463,7 +463,7 @@ env_http_headers = { "X-Example-Env-Header" = "EXAMPLE_ENV_VAR" }
     #[test]
     fn test_deserialize_chat_wire_api_shows_helpful_error() {
         let provider_toml = r#"
-name = "OpenAI using Chat Completions"
+name = "Uxarion-compatible Chat Completions"
 base_url = "https://api.openai.com/v1"
 env_key = "OPENAI_API_KEY"
 wire_api = "chat"

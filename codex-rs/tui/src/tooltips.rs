@@ -3,20 +3,22 @@ use codex_protocol::account::PlanType;
 use lazy_static::lazy_static;
 use rand::Rng;
 
-const ANNOUNCEMENT_TIP_URL: &str =
-    "https://raw.githubusercontent.com/openai/codex/main/announcement_tip.toml";
-
 const IS_MACOS: bool = cfg!(target_os = "macos");
 const IS_WINDOWS: bool = cfg!(target_os = "windows");
 
-const PAID_TOOLTIP: &str = "*New* Try the **Codex App** with 2x rate limits until *April 2nd*. Run 'codex app' or visit https://chatgpt.com/codex?app-landing-page=true";
-const PAID_TOOLTIP_WINDOWS: &str = "*New* Try the **Codex App**, now available on **Windows**, with 2x rate limits until *April 2nd*. Run 'codex app' or visit https://chatgpt.com/codex?app-landing-page=true";
-const PAID_TOOLTIP_NON_MAC: &str = "*New* 2x rate limits until *April 2nd*.";
-const FAST_TOOLTIP: &str = "*New* Use **/fast** to enable our fastest inference at 2X plan usage.";
-const OTHER_TOOLTIP: &str = "*New* Build faster with the **Codex App**. Run 'codex app' or visit https://chatgpt.com/codex?app-landing-page=true";
-const OTHER_TOOLTIP_NON_MAC: &str = "*New* Build faster with Codex.";
+const PAID_TOOLTIP: &str =
+    "*New* Use /apikey to save your API key once and keep Uxarion ready to run.";
+const PAID_TOOLTIP_WINDOWS: &str =
+    "*New* Use /apikey to save your API key once and keep Uxarion ready to run.";
+const PAID_TOOLTIP_NON_MAC: &str =
+    "*New* Start with a scoped task like \"Test https://target for reflected XSS\".";
+const FAST_TOOLTIP: &str = "*New* Use **/fast** when you want quicker low-friction reconnaissance.";
+const OTHER_TOOLTIP: &str =
+    "*New* Keep every task tightly scoped to hosts you are authorized to test.";
+const OTHER_TOOLTIP_NON_MAC: &str =
+    "*New* Keep every task tightly scoped to hosts you are authorized to test.";
 const FREE_GO_TOOLTIP: &str =
-    "*New* Codex is included in your plan for free through *March 2nd* – let’s build together.";
+    "*New* Ask Uxarion to inspect a page, replay requests, and record findings in one thread.";
 
 const RAW_TOOLTIPS: &str = include_str!("../tooltips.txt");
 
@@ -26,9 +28,6 @@ lazy_static! {
         .map(str::trim)
         .filter(|line| {
             if line.is_empty() || line.starts_with('#') {
-                return false;
-            }
-            if !IS_MACOS && !IS_WINDOWS && line.contains("codex app") {
                 return false;
             }
             true
@@ -49,7 +48,7 @@ fn experimental_tooltips() -> Vec<&'static str> {
         .collect()
 }
 
-/// Pick a random tooltip to show to the user when starting Codex.
+/// Pick a random tooltip to show to the user when starting Uxarion.
 pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Option<String> {
     let mut rng = rand::rng();
 
@@ -117,32 +116,32 @@ fn pick_tooltip<R: Rng + ?Sized>(rng: &mut R) -> Option<&'static str> {
 }
 
 pub(crate) mod announcement {
-    use crate::tooltips::ANNOUNCEMENT_TIP_URL;
+    #[cfg(test)]
     use crate::version::CODEX_CLI_VERSION;
+    #[cfg(test)]
     use chrono::NaiveDate;
+    #[cfg(test)]
     use chrono::Utc;
+    #[cfg(test)]
     use regex_lite::Regex;
+    #[cfg(test)]
     use serde::Deserialize;
     use std::sync::OnceLock;
     use std::thread;
-    use std::time::Duration;
 
     static ANNOUNCEMENT_TIP: OnceLock<Option<String>> = OnceLock::new();
 
     /// Prewarm the cache of the announcement tip.
     pub(crate) fn prewarm() {
-        let _ = thread::spawn(|| ANNOUNCEMENT_TIP.get_or_init(init_announcement_tip_in_thread));
+        let _ = thread::spawn(|| ANNOUNCEMENT_TIP.get_or_init(|| None));
     }
 
     /// Fetch the announcement tip, return None if the prewarm is not done yet.
     pub(crate) fn fetch_announcement_tip() -> Option<String> {
-        ANNOUNCEMENT_TIP
-            .get()
-            .cloned()
-            .flatten()
-            .and_then(|raw| parse_announcement_tip_toml(&raw))
+        ANNOUNCEMENT_TIP.get().cloned().flatten()
     }
 
+    #[cfg(test)]
     #[derive(Debug, Deserialize)]
     struct AnnouncementTipRaw {
         content: String,
@@ -152,11 +151,13 @@ pub(crate) mod announcement {
         target_app: Option<String>,
     }
 
+    #[cfg(test)]
     #[derive(Debug, Deserialize)]
     struct AnnouncementTipDocument {
         announcements: Vec<AnnouncementTipRaw>,
     }
 
+    #[cfg(test)]
     #[derive(Debug)]
     struct AnnouncementTip {
         content: String,
@@ -166,27 +167,7 @@ pub(crate) mod announcement {
         target_app: String,
     }
 
-    fn init_announcement_tip_in_thread() -> Option<String> {
-        thread::spawn(blocking_init_announcement_tip)
-            .join()
-            .ok()
-            .flatten()
-    }
-
-    fn blocking_init_announcement_tip() -> Option<String> {
-        // Avoid system proxy detection to prevent macOS system-configuration panics (#8912).
-        let client = reqwest::blocking::Client::builder()
-            .no_proxy()
-            .build()
-            .ok()?;
-        let response = client
-            .get(ANNOUNCEMENT_TIP_URL)
-            .timeout(Duration::from_millis(2000))
-            .send()
-            .ok()?;
-        response.error_for_status().ok()?.text().ok()
-    }
-
+    #[cfg(test)]
     pub(crate) fn parse_announcement_tip_toml(text: &str) -> Option<String> {
         let announcements = toml::from_str::<AnnouncementTipDocument>(text)
             .map(|doc| doc.announcements)
@@ -209,6 +190,7 @@ pub(crate) mod announcement {
         latest_match
     }
 
+    #[cfg(test)]
     impl AnnouncementTip {
         fn from_raw(raw: AnnouncementTipRaw) -> Option<Self> {
             let content = raw.content.trim();
@@ -386,14 +368,14 @@ from_date = "2000-01-01"
     #[test]
     fn announcement_tip_toml_parse_comments() {
         let toml = r#"
-# Example announcement tips for Codex TUI.
+# Example announcement tips for Uxarion.
 # Each [[announcements]] entry is evaluated in order; the last matching one is shown.
 # Dates are UTC, formatted as YYYY-MM-DD. The from_date is inclusive and the to_date is exclusive.
 # version_regex matches against the CLI version (env!("CARGO_PKG_VERSION")); omit to apply to all versions.
 # target_app specify which app should display the announcement (cli, vsce, ...).
 
 [[announcements]]
-content = "Welcome to Codex! Check out the new onboarding flow."
+content = "Welcome to Uxarion! Check out the new onboarding flow."
 from_date = "2024-10-01"
 to_date = "2024-10-15"
 target_app = "cli"

@@ -18,6 +18,9 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
     if !config.check_for_update_on_startup {
         return None;
     }
+    let Some(update_action) = update_action::get_update_action() else {
+        return None;
+    };
 
     let version_file = version_filepath(config);
     let info = read_version_info(&version_file).ok();
@@ -30,7 +33,7 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
         // isn’t blocked by a network call. The UI reads the previously cached
         // value (if any) for this run; the next run shows the banner if needed.
         tokio::spawn(async move {
-            check_for_update(&version_file)
+            check_for_update(&version_file, update_action)
                 .await
                 .inspect_err(|e| tracing::error!("Failed to update version: {e}"))
         });
@@ -78,9 +81,9 @@ fn read_version_info(version_file: &Path) -> anyhow::Result<VersionInfo> {
     Ok(serde_json::from_str(&contents)?)
 }
 
-async fn check_for_update(version_file: &Path) -> anyhow::Result<()> {
-    let latest_version = match update_action::get_update_action() {
-        Some(UpdateAction::BrewUpgrade) => {
+async fn check_for_update(version_file: &Path, update_action: UpdateAction) -> anyhow::Result<()> {
+    let latest_version = match update_action {
+        UpdateAction::BrewUpgrade => {
             let HomebrewCaskInfo { version } = create_client()
                 .get(HOMEBREW_CASK_API_URL)
                 .send()
@@ -90,7 +93,7 @@ async fn check_for_update(version_file: &Path) -> anyhow::Result<()> {
                 .await?;
             version
         }
-        _ => {
+        UpdateAction::NpmGlobalLatest | UpdateAction::BunGlobalLatest => {
             let ReleaseInfo {
                 tag_name: latest_tag_name,
             } = create_client()

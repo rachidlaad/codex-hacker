@@ -23,6 +23,6 @@ expression: term.backend().vt100().screen().contents()
   ↳ Hello, world! 14
   ↳ Hello, world! 15
 
-› Ask Codex to do anything
+› Ask Uxarion to assess a target
 
   ? for shortcuts                                            100% context left

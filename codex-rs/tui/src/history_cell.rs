@@ -509,13 +509,13 @@ impl HistoryCell for UpdateAvailableHistoryCell {
         use ratatui_macros::line;
         use ratatui_macros::text;
         let update_instruction = if let Some(update_action) = self.update_action {
-            line!["Run ", update_action.command_str().cyan(), " to update."]
-        } else {
             line![
-                "See ",
-                "https://github.com/openai/codex".cyan().underlined(),
-                " for installation options."
+                "Run ",
+                update_action.command_str().cyan(),
+                " to update Uxarion."
             ]
+        } else {
+            line!["Check your Uxarion distribution source for update instructions."]
         };
 
         let content = text![
@@ -527,10 +527,7 @@ impl HistoryCell for UpdateAvailableHistoryCell {
             ],
             update_instruction,
             "",
-            "See full release notes:",
-            "https://github.com/openai/codex/releases/latest"
-                .cyan()
-                .underlined(),
+            "Review the latest Uxarion release notes in your distribution source.",
         ];
 
         let inner_width = content
@@ -806,7 +803,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "approved".bold(),
-                    " codex to run ".into(),
+                    " Uxarion to run ".into(),
                     snippet,
                     " this time".bold(),
                 ],
@@ -821,7 +818,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "approved".bold(),
-                    " codex to always run commands that start with ".into(),
+                    " Uxarion to always run commands that start with ".into(),
                     snippet,
                 ],
             )
@@ -833,7 +830,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "approved".bold(),
-                    " codex to run ".into(),
+                    " Uxarion to run ".into(),
                     snippet,
                     " every time this session".bold(),
                 ],
@@ -847,7 +844,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "persisted".bold(),
-                    " Codex network access to ".into(),
+                    " Uxarion network access to ".into(),
                     Span::from(network_policy_amendment.host).dim(),
                 ],
             ),
@@ -856,7 +853,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "denied".bold(),
-                    " codex network access to ".into(),
+                    " Uxarion network access to ".into(),
                     Span::from(network_policy_amendment.host).dim(),
                     " and saved that rule".into(),
                 ],
@@ -869,7 +866,7 @@ pub fn new_approval_decision_cell(
                 vec![
                     "You ".into(),
                     "did not approve".bold(),
-                    " codex to run ".into(),
+                    " Uxarion to run ".into(),
                     snippet,
                 ],
             )
@@ -1078,24 +1075,19 @@ pub(crate) fn new_session_info(
     if is_first_event {
         // Help lines below the header (new copy and list)
         let help_lines: Vec<Line<'static>> = vec![
-            "  To get started, describe a task or try one of these commands:"
+            "  To get started, describe a target and task or try one of these commands:"
                 .dim()
                 .into(),
             Line::from(""),
             Line::from(vec![
                 "  ".into(),
-                "/init".into(),
-                " - create an AGENTS.md file with instructions for Codex".dim(),
-            ]),
-            Line::from(vec![
-                "  ".into(),
-                "/status".into(),
-                " - show current session configuration".dim(),
+                "/apikey".into(),
+                " - save or replace your API key".dim(),
             ]),
             Line::from(vec![
                 "  ".into(),
                 "/permissions".into(),
-                " - choose what Codex is allowed to do".dim(),
+                " - choose what Uxarion is allowed to do".dim(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -1104,8 +1096,13 @@ pub(crate) fn new_session_info(
             ]),
             Line::from(vec![
                 "  ".into(),
-                "/review".into(),
-                " - review any changes and find issues".dim(),
+                "/new".into(),
+                " - start a fresh chat".dim(),
+            ]),
+            Line::from(vec![
+                "  ".into(),
+                "/compact".into(),
+                " - summarize the thread and free context".dim(),
             ]),
         ];
 
@@ -1243,10 +1240,10 @@ impl HistoryCell for SessionHeaderHistoryCell {
 
         let make_row = |spans: Vec<Span<'static>>| Line::from(spans);
 
-        // Title line rendered inside the box: ">_ OpenAI Codex (vX)"
+        // Title line rendered inside the box: ">_ Uxarion (vX)"
         let title_spans: Vec<Span<'static>> = vec![
             Span::from(">_ ").dim(),
-            Span::from("OpenAI Codex").bold(),
+            Span::from("Uxarion").bold(),
             Span::from(" ").dim(),
             Span::from(format!("(v{})", self.version)).dim(),
         ];
@@ -1713,10 +1710,7 @@ pub(crate) fn empty_mcp_output() -> PlainHistoryCell {
         "".into(),
         "  • No MCP servers configured.".italic().into(),
         Line::from(vec![
-            "    See the ".into(),
-            "\u{1b}]8;;https://developers.openai.com/codex/mcp\u{7}MCP docs\u{1b}]8;;\u{7}"
-                .underlined(),
-            " to configure them.".into(),
+            "    Configure MCP servers in your Uxarion config to expose additional tools.".into(),
         ])
         .style(Style::default().add_modifier(Modifier::DIM)),
     ];
@@ -2900,7 +2894,7 @@ mod tests {
         let summary = Line::from(vec![
             "You ".into(),
             "approved".bold(),
-            " codex to run ".into(),
+            " Uxarion to run ".into(),
             "echo something really long to ensure wrapping happens".dim(),
             " this time".bold(),
         ]);
@@ -2909,7 +2903,7 @@ mod tests {
         assert_eq!(
             rendered,
             vec![
-                "✔ You approved codex to".to_string(),
+                "✔ You approved Uxarion to".to_string(),
                 "  run echo something".to_string(),
                 "  really long to ensure".to_string(),
                 "  wrapping happens this".to_string(),

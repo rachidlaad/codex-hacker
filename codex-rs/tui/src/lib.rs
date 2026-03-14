@@ -429,7 +429,7 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
     // Ensure the file is only readable and writable by the current user.
     // Doing the equivalent to `chmod 600` on Windows is quite a bit more code
     // and requires the Windows API crates, so we can reconsider that when
-    // Codex CLI is officially supported on Windows.
+    // Uxarion CLI is officially supported on Windows.
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
@@ -655,7 +655,7 @@ async fn run_ratatui_app(
             thread_name: None,
             update_action: None,
             exit_reason: ExitReason::Fatal(format!(
-                "No saved session found with ID {id_str}. Run `codex {action}` without an ID to choose from existing sessions."
+                "No saved session found with ID {id_str}. Run `uxarion {action}` without an ID to choose from existing sessions."
             )),
         })
     };
@@ -722,7 +722,7 @@ async fn run_ratatui_app(
                                     thread_name: None,
                                     update_action: None,
                                     exit_reason: ExitReason::Fatal(format!(
-                                        "Found latest saved session at {rollout_path}, but failed to read its metadata. Run `codex fork` to choose from existing sessions."
+                                        "Found latest saved session at {rollout_path}, but failed to read its metadata. Run `uxarion fork` to choose from existing sessions."
                                     )),
                                 });
                             }
@@ -813,7 +813,7 @@ async fn run_ratatui_app(
                         thread_name: None,
                         update_action: None,
                         exit_reason: ExitReason::Fatal(format!(
-                            "Found latest saved session at {rollout_path}, but failed to read its metadata. Run `codex resume` to choose from existing sessions."
+                            "Found latest saved session at {rollout_path}, but failed to read its metadata. Run `uxarion resume` to choose from existing sessions."
                         )),
                     });
                 }

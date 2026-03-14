@@ -204,9 +204,7 @@ impl WidgetRef for &UpdatePromptScreen {
         column.push(
             Line::from(vec![
                 "Release notes: ".dim(),
-                "https://github.com/openai/codex/releases/latest"
-                    .dim()
-                    .underlined(),
+                "check your Uxarion distribution source".dim(),
             ])
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );

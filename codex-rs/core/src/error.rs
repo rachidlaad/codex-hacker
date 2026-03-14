@@ -75,7 +75,7 @@ pub enum CodexErr {
     Stream(String, Option<Duration>),
 
     #[error(
-        "Codex ran out of room in the model's context window. Start a new thread or clear earlier history before retrying."
+        "Uxarion ran out of room in the model's context window. Start a new thread or clear earlier history before retrying."
     )]
     ContextWindowExceeded,
 
@@ -130,7 +130,7 @@ pub enum CodexErr {
     QuotaExceeded,
 
     #[error(
-        "To use Codex with your ChatGPT plan, upgrade to Plus: https://chatgpt.com/explore/plus."
+        "This account does not currently include Uxarion usage. Upgrade your access or configure an API key."
     )]
     UsageNotIncluded,
 
@@ -444,7 +444,7 @@ impl std::fmt::Display for UsageLimitReachedError {
 
         let message = match self.plan_type.as_ref() {
             Some(PlanType::Known(KnownPlan::Plus)) => format!(
-                "You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits{}",
+                "You've hit your usage limit. Upgrade your plan or purchase more credits{}",
                 retry_suffix_after_or(self.resets_at.as_ref())
             ),
             Some(PlanType::Known(KnownPlan::Team)) | Some(PlanType::Known(KnownPlan::Business)) => {
@@ -455,12 +455,12 @@ impl std::fmt::Display for UsageLimitReachedError {
             }
             Some(PlanType::Known(KnownPlan::Free)) | Some(PlanType::Known(KnownPlan::Go)) => {
                 format!(
-                    "You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus),{}",
+                    "You've hit your usage limit. Upgrade your plan to continue using Uxarion,{}",
                     retry_suffix_after_or(self.resets_at.as_ref())
                 )
             }
             Some(PlanType::Known(KnownPlan::Pro)) => format!(
-                "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits{}",
+                "You've hit your usage limit. Purchase more credits or switch authentication methods{}",
                 retry_suffix_after_or(self.resets_at.as_ref())
             ),
             Some(PlanType::Known(KnownPlan::Enterprise))
@@ -836,7 +836,7 @@ mod tests {
         };
         assert_eq!(
             err.to_string(),
-            "You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus), or try again later."
+            "You've hit your usage limit. Upgrade your plan to continue using Uxarion, or try again later."
         );
     }
 
@@ -850,7 +850,7 @@ mod tests {
         };
         assert_eq!(
             err.to_string(),
-            "You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus), or try again later."
+            "You've hit your usage limit. Upgrade your plan to continue using Uxarion, or try again later."
         );
     }
 
@@ -1134,11 +1134,11 @@ mod tests {
                 resets_at: Some(resets_at),
                 rate_limits: Some(Box::new(rate_limit_snapshot())),
                 promo_message: Some(
-                    "To continue using Codex, start a free trial of <PLAN> today".to_string(),
+                    "To continue using Uxarion, start a free trial of <PLAN> today".to_string(),
                 ),
             };
             let expected = format!(
-                "You've hit your usage limit. To continue using Codex, start a free trial of <PLAN> today, or try again at {expected_time}."
+                "You've hit your usage limit. To continue using Uxarion, start a free trial of <PLAN> today, or try again at {expected_time}."
             );
             assert_eq!(err.to_string(), expected);
         });

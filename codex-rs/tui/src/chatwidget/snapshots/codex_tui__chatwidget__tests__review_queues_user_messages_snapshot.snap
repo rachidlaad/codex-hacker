@@ -17,6 +17,6 @@ expression: term.backend().vt100().screen().contents()
   ↳ Queued while /review is running.
     ⌥ + ↑ edit last queued message
 
-› Ask Codex to do anything
+› Ask Uxarion to assess a target
 
   ? for shortcuts                                            100% context left

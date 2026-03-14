@@ -19,6 +19,7 @@ mod shell;
 mod test_sync;
 pub(crate) mod unified_exec;
 mod view_image;
+mod zap;
 
 use codex_utils_absolute_path::AbsolutePathBufGuard;
 pub use plan::PLAN_TOOL;
@@ -65,6 +66,7 @@ pub use shell::ShellHandler;
 pub use test_sync::TestSyncHandler;
 pub use unified_exec::UnifiedExecHandler;
 pub use view_image::ViewImageHandler;
+pub use zap::ZapRunHandler;
 
 fn parse_arguments<T>(arguments: &str) -> Result<T, FunctionCallError>
 where

@@ -577,7 +577,7 @@ pub(crate) struct ChatWidget {
     stream_controller: Option<StreamController>,
     // Stream lifecycle controller for proposed plan output.
     plan_stream_controller: Option<PlanStreamController>,
-    // Latest completed user-visible Codex output that `/copy` should place on the clipboard.
+    // Latest completed user-visible Uxarion output that `/copy` should place on the clipboard.
     last_copyable_output: Option<String>,
     running_commands: HashMap<String, RunningCommand>,
     pending_collab_spawn_requests: HashMap<String, multi_agents::SpawnRequestSummary>,
@@ -4461,7 +4461,7 @@ impl ChatWidget {
         );
         let env_api_key_present = codex_core::auth::read_openai_api_key_from_env().is_some();
         let context_label = if env_api_key_present {
-            Some("OPENAI_API_KEY is set in this session".to_string())
+            Some("An API key environment variable is set in this session".to_string())
         } else if has_saved_api_key {
             Some("The current saved key will be replaced".to_string())
         } else {
@@ -4519,7 +4519,7 @@ impl ChatWidget {
             Ok(()) => {
                 auth_manager.reload();
                 let hint = env_api_key_present.then(|| {
-                    "OPENAI_API_KEY is set for this session, so the environment value will keep taking precedence until Uxarion is restarted without it."
+                    "An API key environment variable is set for this session, so that environment value will keep taking precedence until Uxarion is restarted without it."
                         .to_string()
                 });
                 app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
@@ -7203,7 +7203,7 @@ impl ChatWidget {
             header.push(*Box::new(
                 Paragraph::new(vec![
                     line!["Agent mode on Windows uses an experimental sandbox to limit network and filesystem access.".bold()],
-                    line!["Learn more: https://developers.openai.com/codex/windows"],
+                    line!["Review the Uxarion Windows sandbox guide before enabling it."],
                 ])
                 .wrap(Wrap { trim: false }),
             ));
@@ -7248,9 +7248,9 @@ impl ChatWidget {
 
         let mut header = ColumnRenderable::new();
         header.push(*Box::new(
-            Paragraph::new(vec![
-                line!["Set up the Codex agent sandbox to protect your files and control network access. Learn more <https://developers.openai.com/codex/windows>"],
-            ])
+            Paragraph::new(vec![line![
+                "Set up the Uxarion sandbox to protect your files and control network access."
+            ]])
             .wrap(Wrap { trim: false }),
         ));
 
@@ -7317,10 +7317,10 @@ impl ChatWidget {
         ]);
         lines.push(line![""]);
         lines.push(line![
-            "You can still use Codex in a non-admin sandbox. It carries greater risk if prompt injected."
+            "You can still use Uxarion in a non-admin sandbox. It carries greater risk if prompt injected."
         ]);
         lines.push(line![
-            "Learn more <https://developers.openai.com/codex/windows>"
+            "Review the Uxarion Windows sandbox guide before continuing."
         ]);
 
         let mut header = ColumnRenderable::new();
@@ -7347,7 +7347,7 @@ impl ChatWidget {
                 ..Default::default()
             },
             SelectionItem {
-                name: "Use Codex with non-admin sandbox".to_string(),
+                name: "Use Uxarion with non-admin sandbox".to_string(),
                 description: None,
                 actions: vec![Box::new({
                     let otel = self.session_telemetry.clone();
@@ -7998,7 +7998,7 @@ impl ChatWidget {
 
     fn rename_confirmation_cell(name: &str, thread_id: Option<ThreadId>) -> PlainHistoryCell {
         let resume_cmd = codex_core::util::resume_command(Some(name), thread_id)
-            .unwrap_or_else(|| format!("codex resume {name}"));
+            .unwrap_or_else(|| format!("uxarion resume {name}"));
         let name = name.to_string();
         let line = vec![
             "• ".into(),
@@ -8135,7 +8135,7 @@ impl ChatWidget {
             let instructions = if connector.is_accessible {
                 "Manage this app in your browser."
             } else {
-                "Install this app in your browser, then reload Codex."
+                "Install this app in your browser, then reload Uxarion."
             };
             if let Some(install_url) = connector.install_url.clone() {
                 let app_id = connector.id.clone();

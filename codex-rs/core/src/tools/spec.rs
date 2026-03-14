@@ -809,6 +809,56 @@ fn create_http_inspect_tool() -> ToolSpec {
     })
 }
 
+fn create_zap_run_tool() -> ToolSpec {
+    ToolSpec::Function(ResponsesApiTool {
+        name: "zap_run".to_string(),
+        description:
+            "Run an in-scope web scan through the configured ZAP API service. Prefer this over `security_exec` when ZAP is available for crawling, passive checks, and active web scanning."
+                .to_string(),
+        strict: false,
+        parameters: JsonSchema::Object {
+            properties: BTreeMap::from([
+                (
+                    "target".to_string(),
+                    JsonSchema::String {
+                        description: Some("Absolute in-scope HTTP or HTTPS URL to scan.".to_string()),
+                    },
+                ),
+                (
+                    "scan_type".to_string(),
+                    JsonSchema::String {
+                        description: Some(
+                            "ZAP scan depth to run: passive, spider, or active. Defaults to spider."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "max_minutes".to_string(),
+                    JsonSchema::Number {
+                        description: Some(
+                            "Maximum number of minutes to wait for the scan to finish before timing out."
+                                .to_string(),
+                        ),
+                    },
+                ),
+                (
+                    "max_alerts".to_string(),
+                    JsonSchema::Number {
+                        description: Some(
+                            "Maximum number of ZAP alerts to fetch and return from the scan."
+                                .to_string(),
+                        ),
+                    },
+                ),
+            ]),
+            required: Some(vec!["target".to_string()]),
+            additional_properties: Some(false.into()),
+        },
+        output_schema: None,
+    })
+}
+
 fn create_capture_evidence_tool() -> ToolSpec {
     ToolSpec::Function(ResponsesApiTool {
         name: "capture_evidence".to_string(),
@@ -2480,6 +2530,7 @@ pub(crate) fn build_specs(
     use crate::tools::handlers::TestSyncHandler;
     use crate::tools::handlers::UnifiedExecHandler;
     use crate::tools::handlers::ViewImageHandler;
+    use crate::tools::handlers::ZapRunHandler;
     use std::sync::Arc;
 
     let mut builder = ToolRegistryBuilder::new();
@@ -2509,6 +2560,7 @@ pub(crate) fn build_specs(
     let capture_evidence_handler = Arc::new(CaptureEvidenceHandler);
     let record_finding_handler = Arc::new(RecordFindingHandler);
     let report_write_handler = Arc::new(ReportWriteHandler);
+    let zap_run_handler = Arc::new(ZapRunHandler);
 
     if config.code_mode_enabled {
         let nested_config = config.for_code_mode_nested_tools();
@@ -2563,6 +2615,12 @@ pub(crate) fn build_specs(
         );
         push_tool_spec(
             &mut builder,
+            create_zap_run_tool(),
+            true,
+            config.code_mode_enabled,
+        );
+        push_tool_spec(
+            &mut builder,
             create_capture_evidence_tool(),
             false,
             config.code_mode_enabled,
@@ -2583,6 +2641,7 @@ pub(crate) fn build_specs(
         builder.register_handler("write_stdin", unified_exec_handler);
         builder.register_handler("scope_validate", scope_validate_handler);
         builder.register_handler("http_inspect", http_inspect_handler);
+        builder.register_handler("zap_run", zap_run_handler);
         builder.register_handler("capture_evidence", capture_evidence_handler);
         builder.register_handler("record_finding", record_finding_handler);
         builder.register_handler("report_write", report_write_handler);
@@ -5172,6 +5231,7 @@ Examples of valid command strings:
                 "write_stdin",
                 "scope_validate",
                 "http_inspect",
+                "zap_run",
                 "capture_evidence",
                 "record_finding",
                 "report_write",

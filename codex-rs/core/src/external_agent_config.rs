@@ -841,7 +841,7 @@ mod tests {
 
         assert_eq!(
             fs::read_to_string(codex_home.join("AGENTS.md")).expect("read agents"),
-            "Codex guidance"
+            "Uxarion guidance"
         );
 
         assert_eq!(
@@ -851,7 +851,7 @@ mod tests {
         assert_eq!(
             fs::read_to_string(agents_skills.join("skill-a").join("SKILL.md"))
                 .expect("read copied skill"),
-            "Use Codex and Codex utilities."
+            "Use Uxarion and Uxarion utilities."
         );
     }
 
@@ -993,7 +993,7 @@ mod tests {
 
         assert_eq!(
             fs::read_to_string(repo_root.join("AGENTS.md")).expect("read target"),
-            "Codex guidance"
+            "Uxarion guidance"
         );
     }
 
@@ -1054,7 +1054,7 @@ mod tests {
 
         assert_eq!(
             fs::read_to_string(repo_root.join("AGENTS.md")).expect("read target"),
-            "Codex guidance"
+            "Uxarion guidance"
         );
     }
 

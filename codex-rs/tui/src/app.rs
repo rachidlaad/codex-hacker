@@ -2781,7 +2781,7 @@ impl App {
                                     Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
                                     Line::from(vec![
                                         "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
+                                        "Uxarion can now safely edit files and execute commands on your computer"
                                             .dark_gray(),
                                     ]),
                                 ]);
@@ -6777,7 +6777,7 @@ mod tests {
         );
         assert_eq!(
             summary.resume_command,
-            Some("codex resume 123e4567-e89b-12d3-a456-426614174000".to_string())
+            Some("uxarion resume 123e4567-e89b-12d3-a456-426614174000".to_string())
         );
     }
 
@@ -6795,7 +6795,7 @@ mod tests {
             .expect("summary");
         assert_eq!(
             summary.resume_command,
-            Some("codex resume my-session".to_string())
+            Some("uxarion resume my-session".to_string())
         );
     }
 }

@@ -18,7 +18,7 @@ use tracing::debug;
 use tracing::info;
 use tracing::warn;
 
-const STARTUP_CONTEXT_HEADER: &str = "Startup context from Codex.\nThis is background context about recent work and machine/workspace layout. It may be incomplete or stale. Use it to inform responses, and do not repeat it back unless relevant.";
+const STARTUP_CONTEXT_HEADER: &str = "Startup context from Uxarion.\nThis is background context about recent work and machine/workspace layout. It may be incomplete or stale. Use it to inform responses, and do not repeat it back unless relevant.";
 const RECENT_WORK_SECTION_TOKEN_BUDGET: usize = 2_200;
 const WORKSPACE_SECTION_TOKEN_BUDGET: usize = 1_600;
 const NOTES_SECTION_TOKEN_BUDGET: usize = 300;

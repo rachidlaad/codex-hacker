@@ -82,7 +82,7 @@ pub(crate) fn migration_copy_for_models(
     }
 
     let heading_text = Span::from(format!(
-        "Codex just got an upgrade. Introducing {target_display_name}."
+        "Uxarion just got an upgrade. Introducing {target_display_name}."
     ))
     .bold();
     let description_line: Line<'static>;
@@ -334,7 +334,7 @@ impl ModelMigrationScreen {
     fn render_menu(&self, column: &mut ColumnRenderable) {
         column.push(Line::from(""));
         column.push(
-            Paragraph::new("Choose how you'd like Codex to proceed.")
+            Paragraph::new("Choose how you'd like Uxarion to proceed.")
                 .wrap(Wrap { trim: false })
                 .inset(Insets::tlbr(0, 2, 0, 0)),
         );
@@ -428,7 +428,7 @@ mod tests {
                 ),
                 None,
                 "gpt-5.1-codex-max".to_string(),
-                Some("Codex-optimized flagship for deep and fast reasoning.".to_string()),
+                Some("Uxarion-optimized flagship for deep and fast reasoning.".to_string()),
                 true,
             ),
         );
@@ -484,7 +484,7 @@ mod tests {
                 None,
                 None,
                 "gpt-5.1-codex-max".to_string(),
-                Some("Codex-optimized flagship for deep and fast reasoning.".to_string()),
+                Some("Uxarion-optimized flagship for deep and fast reasoning.".to_string()),
                 false,
             ),
         );

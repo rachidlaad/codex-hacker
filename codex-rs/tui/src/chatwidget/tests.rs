@@ -1790,7 +1790,7 @@ async fn make_chatwidget_manual(
         frame_requester: FrameRequester::test_dummy(),
         has_input_focus: true,
         enhanced_keys_supported: false,
-        placeholder_text: "Ask Codex to do anything".to_string(),
+        placeholder_text: "Ask Uxarion to assess a target".to_string(),
         disable_paste_burst: false,
         animations_enabled: cfg.animations,
         skills: None,
@@ -5341,7 +5341,7 @@ async fn slash_init_skips_when_project_doc_exists() {
 
     match op_rx.try_recv() {
         Err(TryRecvError::Empty) => {}
-        other => panic!("expected no Codex op to be sent, got {other:?}"),
+        other => panic!("expected no Uxarion op to be sent, got {other:?}"),
     }
 
     let cells = drain_insert_history(&mut rx);
@@ -5845,7 +5845,7 @@ async fn slash_copy_reports_when_no_copyable_output_exists() {
     assert_snapshot!("slash_copy_no_output_info_message", rendered);
     assert!(
         rendered.contains(
-            "`/copy` is unavailable before the first Codex output or right after a rollback."
+            "`/copy` is unavailable before the first Uxarion output or right after a rollback."
         ),
         "expected no-output message, got {rendered:?}"
     );
@@ -5917,7 +5917,7 @@ async fn slash_copy_is_unavailable_when_legacy_agent_message_is_not_repeated_on_
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
         rendered.contains(
-            "`/copy` is unavailable before the first Codex output or right after a rollback."
+            "`/copy` is unavailable before the first Uxarion output or right after a rollback."
         ),
         "expected unavailable message, got {rendered:?}"
     );
@@ -5946,7 +5946,7 @@ async fn slash_copy_is_unavailable_when_legacy_agent_message_item_is_not_repeate
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
         rendered.contains(
-            "`/copy` is unavailable before the first Codex output or right after a rollback."
+            "`/copy` is unavailable before the first Uxarion output or right after a rollback."
         ),
         "expected unavailable message, got {rendered:?}"
     );
@@ -5978,7 +5978,7 @@ async fn slash_copy_does_not_return_stale_output_after_thread_rollback() {
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
         rendered.contains(
-            "`/copy` is unavailable before the first Codex output or right after a rollback."
+            "`/copy` is unavailable before the first Uxarion output or right after a rollback."
         ),
         "expected rollback-cleared copy state message, got {rendered:?}"
     );
@@ -7039,7 +7039,7 @@ async fn apps_popup_keeps_existing_full_snapshot_while_partial_refresh_loads() {
                 },
                 codex_chatgpt::connectors::AppInfo {
                     id: "connector_openai_hidden".to_string(),
-                    name: "Hidden OpenAI".to_string(),
+                    name: "Hidden Legacy Provider".to_string(),
                     description: Some("Should be filtered".to_string()),
                     logo_url: None,
                     logo_url_dark: None,
@@ -7068,7 +7068,7 @@ async fn apps_popup_keeps_existing_full_snapshot_while_partial_refresh_loads() {
         "expected popup to keep the last full snapshot while partial refresh loads, got:\n{popup}"
     );
     assert!(
-        !popup.contains("Hidden OpenAI"),
+        !popup.contains("Hidden Legacy Provider"),
         "expected popup to ignore partial refresh rows until the full list arrives, got:\n{popup}"
     );
 }

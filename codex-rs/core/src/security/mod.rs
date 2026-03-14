@@ -20,6 +20,8 @@ use tokio::fs;
 use tokio::sync::Mutex;
 use url::Url;
 
+mod zap;
+
 pub(crate) const SECURITY_PROFILE_NAME: &str = "security";
 pub(crate) const SECURITY_CONTEXT_OPEN_TAG: &str = "<security_context>";
 pub(crate) const SECURITY_CONTEXT_CLOSE_TAG: &str = "</security_context>";
@@ -161,10 +163,13 @@ pub(crate) struct SecuritySessionState {
 pub(crate) struct SecurityToolInventory {
     pub available: Vec<String>,
     pub missing: Vec<String>,
+    pub zap_api_base_url: String,
+    pub zap_api_key_configured: bool,
 }
 
 impl SecurityToolInventory {
     fn discover() -> Self {
+        let zap_api_key = zap::resolve_zap_api_key();
         let mut available = Vec::new();
         let mut missing = Vec::new();
         for binary in SECURITY_BINARY_ALLOWLIST {
@@ -176,7 +181,12 @@ impl SecurityToolInventory {
         }
         available.sort();
         missing.sort();
-        Self { available, missing }
+        Self {
+            available,
+            missing,
+            zap_api_base_url: zap::resolve_zap_base_url(),
+            zap_api_key_configured: zap_api_key.is_some(),
+        }
     }
 }
 
@@ -253,10 +263,6 @@ impl SecuritySessionStateService {
             inventory,
             state: Mutex::new(initial_state),
         }
-    }
-
-    pub(crate) fn is_enabled(&self) -> bool {
-        self.enabled
     }
 
     pub(crate) async fn render_context_fragment(&self, history: &[ResponseItem]) -> Option<String> {
@@ -423,6 +429,26 @@ impl SecuritySessionStateService {
         let snapshot = state.clone();
         drop(state);
         self.persist_state(&snapshot).await
+    }
+
+    pub(crate) async fn record_discovered_urls(
+        &self,
+        urls: &[String],
+    ) -> Result<SecuritySessionState, FunctionCallError> {
+        if !self.enabled {
+            return Err(FunctionCallError::RespondToModel(
+                "security state is disabled for this session".to_string(),
+            ));
+        }
+
+        let mut state = self.state.lock().await;
+        for url in urls {
+            push_unique(&mut state.urls, url.clone());
+        }
+        let snapshot = state.clone();
+        drop(state);
+        self.persist_state(&snapshot).await?;
+        Ok(snapshot)
     }
 
     pub(crate) async fn capture_text_evidence(
@@ -690,10 +716,6 @@ impl SecuritySessionStateService {
             serde_json::to_string_pretty(&output).unwrap_or_else(|_| output.to_string()),
             Some(true),
         ))
-    }
-
-    pub(crate) fn command_inventory(&self) -> &SecurityToolInventory {
-        &self.inventory
     }
 
     async fn ensure_default_scope_from_history(&self, history: &[ResponseItem]) {
@@ -1119,6 +1141,10 @@ fn render_report_markdown(
     }
     lines.join("\n")
 }
+
+pub(crate) use zap::ZapClient;
+pub(crate) use zap::ZapRunRequest;
+pub(crate) use zap::ZapScanType;
 
 #[cfg(test)]
 mod tests {
