@@ -4,9 +4,9 @@ expression: terminal.backend()
 ---
   ✨ Update available! 0.0.0 -> 9.9.9
 
-  Release notes: check your Uxarion distribution source
+  Update source: https://github.com/rachidlaad/uxarion-security
 
-› 1. Update now (runs `npm install -g @openaiuxarion@latest`)                    
+› 1. Update now (runs `uxarion update`)
   2. Skip
   3. Skip until next version
 

@@ -1,5 +1,6 @@
 use crate::CodexAuth;
 use crate::api_bridge::map_api_error;
+use crate::api_bridge::provider_api_key_or_saved_auth;
 use crate::auth::read_openai_api_key_from_env;
 use crate::codex::Session;
 use crate::default_client::default_headers;
@@ -411,7 +412,7 @@ fn realtime_api_key(
     auth: Option<&CodexAuth>,
     provider: &crate::ModelProviderInfo,
 ) -> CodexResult<String> {
-    if let Some(api_key) = provider.api_key()? {
+    if let Some(api_key) = provider_api_key_or_saved_auth(auth, provider)? {
         return Ok(api_key);
     }
 
@@ -603,7 +604,11 @@ async fn send_conversation_error(
 mod tests {
     use super::HandoffOutput;
     use super::RealtimeHandoffState;
+    use super::realtime_api_key;
     use super::realtime_text_from_handoff_request;
+    use crate::CodexAuth;
+    use crate::ModelProviderInfo;
+    use crate::model_provider_info::WireApi;
     use async_channel::bounded;
     use codex_protocol::protocol::RealtimeHandoffRequested;
     use codex_protocol::protocol::RealtimeTranscriptEntry;
@@ -714,5 +719,30 @@ mod tests {
             .await
             .expect("send");
         assert!(rx.is_empty());
+    }
+
+    #[test]
+    fn realtime_api_key_uses_saved_auth_when_env_key_missing() {
+        let provider = ModelProviderInfo {
+            name: "custom".into(),
+            base_url: Some("http://127.0.0.1:8080/v1".into()),
+            env_key: Some("__UXARION_TEST_MISSING_ENV_KEY__".into()),
+            env_key_instructions: None,
+            experimental_bearer_token: None,
+            wire_api: WireApi::Responses,
+            query_params: None,
+            http_headers: None,
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        };
+
+        let api_key = realtime_api_key(Some(&CodexAuth::from_api_key("saved-api-key")), &provider)
+            .expect("saved auth key should be used");
+
+        assert_eq!(api_key, "saved-api-key");
     }
 }

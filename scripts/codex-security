@@ -7,6 +7,9 @@ BIN="${CODEX_SECURITY_BIN:-$BUILD_ROOT/debug/codex}"
 SECURITY_HOME="${CODEX_SECURITY_HOME:-$HOME/.uxarion}"
 BASE_URL="${PENTEST_LOCAL_BASE_URL:-https://api.openai.com/v1}"
 ZAP_BASE_URL="${UXARION_ZAP_BASE_URL:-http://172.17.160.1:8080}"
+UPDATE_REMOTE="${UXARION_UPDATE_REMOTE:-uxarion}"
+UPDATE_BRANCH="${UXARION_UPDATE_BRANCH:-main}"
+UPDATE_REPO_URL="${UXARION_UPDATE_REPO_URL:-https://github.com/rachidlaad/uxarion-security}"
 
 ensure_config() {
   mkdir -p "$SECURITY_HOME"
@@ -41,6 +44,27 @@ ensure_binary() {
   )
 }
 
+ensure_update_remote() {
+  if git -C "$REPO_ROOT" remote get-url "$UPDATE_REMOTE" >/dev/null 2>&1; then
+    return
+  fi
+
+  git -C "$REPO_ROOT" remote add "$UPDATE_REMOTE" "$UPDATE_REPO_URL"
+}
+
+run_update() {
+  ensure_update_remote
+
+  echo "Updating Uxarion from $UPDATE_REMOTE/$UPDATE_BRANCH..." >&2
+  git -C "$REPO_ROOT" pull --ff-only "$UPDATE_REMOTE" "$UPDATE_BRANCH"
+
+  echo "Rebuilding Uxarion..." >&2
+  (
+    cd "$REPO_ROOT/codex-rs"
+    CARGO_TARGET_DIR="$BUILD_ROOT" cargo build -p codex-cli
+  )
+}
+
 wants_help_only() {
   if [[ $# -eq 0 ]]; then
     return 1
@@ -58,11 +82,21 @@ wants_help_only() {
 
 main() {
   ensure_config
-  ensure_binary
 
   export CODEX_HOME="$SECURITY_HOME"
   export PENTEST_LOCAL_BASE_URL="$BASE_URL"
   export UXARION_ZAP_BASE_URL="$ZAP_BASE_URL"
+  export UXARION_UPDATE_REPO="$REPO_ROOT"
+  export UXARION_UPDATE_REMOTE="$UPDATE_REMOTE"
+  export UXARION_UPDATE_BRANCH="$UPDATE_BRANCH"
+  export UXARION_UPDATE_REPO_URL="$UPDATE_REPO_URL"
+
+  if [[ $# -gt 0 && "$1" == "update" ]]; then
+    run_update
+    exit 0
+  fi
+
+  ensure_binary
 
   if [[ " $* " == *" --profile "* ]] || [[ " $* " == *" -p "* ]]; then
     exec "$BIN" "$@"

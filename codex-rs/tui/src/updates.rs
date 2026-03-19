@@ -1,5 +1,3 @@
-#![cfg(not(debug_assertions))]
-
 use crate::update_action;
 use crate::update_action::UpdateAction;
 use chrono::DateTime;
@@ -11,6 +9,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 
 use crate::version::CODEX_CLI_VERSION;
 
@@ -39,11 +38,18 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
         });
     }
 
-    info.and_then(|info| {
-        if is_newer(&info.latest_version, CODEX_CLI_VERSION).unwrap_or(false) {
-            Some(info.latest_version)
-        } else {
-            None
+    info.and_then(|info| match update_action {
+        UpdateAction::UxarionGitCheckout => (info.latest_version
+            != update_action.current_version_value())
+        .then_some(info.latest_version),
+        UpdateAction::NpmGlobalLatest
+        | UpdateAction::BunGlobalLatest
+        | UpdateAction::BrewUpgrade => {
+            if is_newer(&info.latest_version, CODEX_CLI_VERSION).unwrap_or(false) {
+                Some(info.latest_version)
+            } else {
+                None
+            }
         }
     })
 }
@@ -58,18 +64,12 @@ struct VersionInfo {
 }
 
 const VERSION_FILENAME: &str = "version.json";
-// We use the latest version from the cask if installation is via homebrew - homebrew does not immediately pick up the latest release and can lag behind.
-const HOMEBREW_CASK_API_URL: &str = "https://formulae.brew.sh/api/cask/codex.json";
-const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/openai/codex/releases/latest";
+const LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/rachidlaad/uxarion-security/releases/latest";
 
 #[derive(Deserialize, Debug, Clone)]
 struct ReleaseInfo {
     tag_name: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct HomebrewCaskInfo {
-    version: String,
 }
 
 fn version_filepath(config: &Config) -> PathBuf {
@@ -83,17 +83,10 @@ fn read_version_info(version_file: &Path) -> anyhow::Result<VersionInfo> {
 
 async fn check_for_update(version_file: &Path, update_action: UpdateAction) -> anyhow::Result<()> {
     let latest_version = match update_action {
-        UpdateAction::BrewUpgrade => {
-            let HomebrewCaskInfo { version } = create_client()
-                .get(HOMEBREW_CASK_API_URL)
-                .send()
-                .await?
-                .error_for_status()?
-                .json::<HomebrewCaskInfo>()
-                .await?;
-            version
-        }
-        UpdateAction::NpmGlobalLatest | UpdateAction::BunGlobalLatest => {
+        UpdateAction::UxarionGitCheckout => latest_checkout_revision()?,
+        UpdateAction::NpmGlobalLatest
+        | UpdateAction::BunGlobalLatest
+        | UpdateAction::BrewUpgrade => {
             let ReleaseInfo {
                 tag_name: latest_tag_name,
             } = create_client()
@@ -133,6 +126,8 @@ fn is_newer(latest: &str, current: &str) -> Option<bool> {
 fn extract_version_from_latest_tag(latest_tag_name: &str) -> anyhow::Result<String> {
     latest_tag_name
         .strip_prefix("rust-v")
+        .or_else(|| latest_tag_name.strip_prefix("uxarion-v"))
+        .or_else(|| latest_tag_name.strip_prefix('v'))
         .map(str::to_owned)
         .ok_or_else(|| anyhow::anyhow!("Failed to parse latest tag name '{latest_tag_name}'"))
 }
@@ -180,24 +175,34 @@ fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
     Some((maj, min, pat))
 }
 
+fn latest_checkout_revision() -> anyhow::Result<String> {
+    let Some(repo_root) = update_action::update_repo_root() else {
+        anyhow::bail!("Uxarion update repo is not configured");
+    };
+    let remote = update_action::update_repo_remote();
+    let branch = update_action::update_repo_branch();
+    let output = Command::new("git")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .arg("-C")
+        .arg(&repo_root)
+        .args(["ls-remote", "--heads", remote.as_str(), branch.as_str()])
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!("Failed to query {remote}:{branch} for updates");
+    }
+    let stdout = String::from_utf8(output.stdout)?;
+    let Some(line) = stdout.lines().next() else {
+        anyhow::bail!("No remote revision found for {remote}:{branch}");
+    };
+    let Some((revision, _)) = line.split_once('\t') else {
+        anyhow::bail!("Failed to parse remote revision for {remote}:{branch}");
+    };
+    Ok(revision.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn extract_version_from_brew_api_json() {
-        //
-        // https://formulae.brew.sh/api/cask/codex.json
-        let cask_json = r#"{
-            "token": "codex",
-            "full_token": "codex",
-            "tap": "homebrew/cask",
-            "version": "0.96.0",
-        }"#;
-        let HomebrewCaskInfo { version } = serde_json::from_str::<HomebrewCaskInfo>(cask_json)
-            .expect("failed to parse version from cask json");
-        assert_eq!(version, "0.96.0");
-    }
 
     #[test]
     fn extracts_version_from_latest_tag() {
@@ -205,11 +210,19 @@ mod tests {
             extract_version_from_latest_tag("rust-v1.5.0").expect("failed to parse version"),
             "1.5.0"
         );
+        assert_eq!(
+            extract_version_from_latest_tag("uxarion-v1.5.0").expect("failed to parse version"),
+            "1.5.0"
+        );
+        assert_eq!(
+            extract_version_from_latest_tag("v1.5.0").expect("failed to parse version"),
+            "1.5.0"
+        );
     }
 
     #[test]
-    fn latest_tag_without_prefix_is_invalid() {
-        assert!(extract_version_from_latest_tag("v1.5.0").is_err());
+    fn latest_tag_without_supported_prefix_is_invalid() {
+        assert!(extract_version_from_latest_tag("1.5.0").is_err());
     }
 
     #[test]

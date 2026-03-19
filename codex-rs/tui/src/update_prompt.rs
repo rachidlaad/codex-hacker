@@ -1,5 +1,3 @@
-#![cfg(not(debug_assertions))]
-
 use crate::history_cell::padded_emoji;
 use crate::key_hint;
 use crate::render::Insets;
@@ -108,7 +106,7 @@ impl UpdatePromptScreen {
         Self {
             request_frame,
             latest_version,
-            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            current_version: update_action.current_version_label(),
             update_action,
             highlighted: UpdateSelection::UpdateNow,
             selection: None,
@@ -187,6 +185,10 @@ impl WidgetRef for &UpdatePromptScreen {
         let mut column = ColumnRenderable::new();
 
         let update_command = self.update_action.command_str();
+        let latest_version = self
+            .update_action
+            .format_latest_version(self.latest_version.as_str());
+        let update_source = self.update_action.source_label();
 
         column.push("");
         column.push(Line::from(vec![
@@ -196,17 +198,14 @@ impl WidgetRef for &UpdatePromptScreen {
             format!(
                 "{current} -> {latest}",
                 current = self.current_version,
-                latest = self.latest_version
+                latest = latest_version
             )
             .dim(),
         ]));
         column.push("");
         column.push(
-            Line::from(vec![
-                "Release notes: ".dim(),
-                "check your Uxarion distribution source".dim(),
-            ])
-            .inset(Insets::tlbr(0, 2, 0, 0)),
+            Line::from(vec!["Update source: ".dim(), update_source.dim()])
+                .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.push("");
         column.push(selection_option_row(
@@ -251,7 +250,7 @@ mod tests {
         UpdatePromptScreen::new(
             FrameRequester::test_dummy(),
             "9.9.9".into(),
-            UpdateAction::NpmGlobalLatest,
+            UpdateAction::UxarionGitCheckout,
         )
     }
 

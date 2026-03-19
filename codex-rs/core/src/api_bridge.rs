@@ -217,6 +217,59 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn provider_api_key_uses_saved_auth_when_env_key_missing() {
+        let provider = ModelProviderInfo {
+            name: "custom".into(),
+            base_url: Some("http://127.0.0.1:8080/v1".into()),
+            env_key: Some("__UXARION_TEST_MISSING_ENV_KEY__".into()),
+            env_key_instructions: None,
+            experimental_bearer_token: None,
+            wire_api: crate::model_provider_info::WireApi::Responses,
+            query_params: None,
+            http_headers: None,
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        };
+
+        let api_key = provider_api_key_or_saved_auth(
+            Some(&CodexAuth::from_api_key("saved-api-key")),
+            &provider,
+        )
+        .expect("saved auth key should be used");
+
+        assert_eq!(api_key, Some("saved-api-key".to_string()));
+    }
+
+    #[test]
+    fn provider_api_key_returns_env_error_without_saved_auth() {
+        let provider = ModelProviderInfo {
+            name: "custom".into(),
+            base_url: Some("http://127.0.0.1:8080/v1".into()),
+            env_key: Some("__UXARION_TEST_MISSING_ENV_KEY__".into()),
+            env_key_instructions: Some("set it".into()),
+            experimental_bearer_token: None,
+            wire_api: crate::model_provider_info::WireApi::Responses,
+            query_params: None,
+            http_headers: None,
+            env_http_headers: None,
+            request_max_retries: None,
+            stream_max_retries: None,
+            stream_idle_timeout_ms: None,
+            requires_openai_auth: false,
+            supports_websockets: false,
+        };
+
+        let err = provider_api_key_or_saved_auth(None, &provider)
+            .expect_err("missing env key should still error");
+
+        assert!(matches!(err, CodexErr::EnvVar(_)));
+    }
 }
 
 fn extract_request_tracking_id(headers: Option<&HeaderMap>) -> Option<String> {
@@ -240,7 +293,7 @@ pub(crate) fn auth_provider_from_auth(
     auth: Option<CodexAuth>,
     provider: &ModelProviderInfo,
 ) -> crate::error::Result<CoreAuthProvider> {
-    if let Some(api_key) = provider.api_key()? {
+    if let Some(api_key) = provider_api_key_or_saved_auth(auth.as_ref(), provider)? {
         return Ok(CoreAuthProvider {
             token: Some(api_key),
             account_id: None,
@@ -265,6 +318,20 @@ pub(crate) fn auth_provider_from_auth(
             token: None,
             account_id: None,
         })
+    }
+}
+
+pub(crate) fn provider_api_key_or_saved_auth(
+    auth: Option<&CodexAuth>,
+    provider: &ModelProviderInfo,
+) -> crate::error::Result<Option<String>> {
+    match provider.api_key() {
+        Ok(api_key) => Ok(api_key),
+        Err(err @ CodexErr::EnvVar(_)) => auth
+            .and_then(CodexAuth::api_key)
+            .map(|api_key| Ok(Some(api_key.to_string())))
+            .unwrap_or(Err(err)),
+        Err(err) => Err(err),
     }
 }
 

@@ -31,6 +31,7 @@ use crate::text_formatting::format_and_truncate_tool_result;
 use crate::text_formatting::truncate_text;
 use crate::tooltips;
 use crate::ui_consts::LIVE_PREFIX_COLS;
+use crate::update_action::DEFAULT_UXARION_UPDATE_REPO_URL;
 use crate::update_action::UpdateAction;
 use crate::version::CODEX_CLI_VERSION;
 use crate::wrapping::RtOptions;
@@ -508,6 +509,18 @@ impl HistoryCell for UpdateAvailableHistoryCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
         use ratatui_macros::line;
         use ratatui_macros::text;
+        let update_source = self
+            .update_action
+            .map(UpdateAction::source_label)
+            .unwrap_or_else(|| DEFAULT_UXARION_UPDATE_REPO_URL.to_string());
+        let latest_version = self
+            .update_action
+            .map(|action| action.format_latest_version(&self.latest_version))
+            .unwrap_or_else(|| self.latest_version.clone());
+        let current_version = self
+            .update_action
+            .map(UpdateAction::current_version_label)
+            .unwrap_or_else(|| CODEX_CLI_VERSION.to_string());
         let update_instruction = if let Some(update_action) = self.update_action {
             line![
                 "Run ",
@@ -523,11 +536,11 @@ impl HistoryCell for UpdateAvailableHistoryCell {
                 padded_emoji("✨").bold().cyan(),
                 "Update available!".bold().cyan(),
                 " ",
-                format!("{CODEX_CLI_VERSION} -> {}", self.latest_version).bold(),
+                format!("{current_version} -> {latest_version}").bold(),
             ],
             update_instruction,
             "",
-            "Review the latest Uxarion release notes in your distribution source.",
+            format!("Update source: {update_source}"),
         ];
 
         let inner_width = content

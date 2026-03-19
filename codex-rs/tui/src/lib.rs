@@ -555,24 +555,21 @@ async fn run_ratatui_app(
 
     let mut tui = Tui::new(terminal);
 
-    #[cfg(not(debug_assertions))]
-    {
-        use crate::update_prompt::UpdatePromptOutcome;
+    use crate::update_prompt::UpdatePromptOutcome;
 
-        let skip_update_prompt = cli.prompt.as_ref().is_some_and(|prompt| !prompt.is_empty());
-        if !skip_update_prompt {
-            match update_prompt::run_update_prompt_if_needed(&mut tui, &initial_config).await? {
-                UpdatePromptOutcome::Continue => {}
-                UpdatePromptOutcome::RunUpdate(action) => {
-                    crate::tui::restore()?;
-                    return Ok(AppExitInfo {
-                        token_usage: codex_protocol::protocol::TokenUsage::default(),
-                        thread_id: None,
-                        thread_name: None,
-                        update_action: Some(action),
-                        exit_reason: ExitReason::UserRequested,
-                    });
-                }
+    let skip_update_prompt = cli.prompt.as_ref().is_some_and(|prompt| !prompt.is_empty());
+    if !skip_update_prompt {
+        match update_prompt::run_update_prompt_if_needed(&mut tui, &initial_config).await? {
+            UpdatePromptOutcome::Continue => {}
+            UpdatePromptOutcome::RunUpdate(action) => {
+                crate::tui::restore()?;
+                return Ok(AppExitInfo {
+                    token_usage: codex_protocol::protocol::TokenUsage::default(),
+                    thread_id: None,
+                    thread_name: None,
+                    update_action: Some(action),
+                    exit_reason: ExitReason::UserRequested,
+                });
             }
         }
     }

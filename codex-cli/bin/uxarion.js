@@ -1,25 +1,46 @@
 #!/usr/bin/env node
-// Unified entry point for the Codex CLI.
+// Unified entry point for the Uxarion CLI.
 
-import { spawn } from "node:child_process";
-import { existsSync } from "fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  unlinkSync,
+} from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import path from "path";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "url";
 
 // __dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
+const packageMetadata = require("../package.json");
 
 const PLATFORM_PACKAGE_BY_TARGET = {
-  "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
-  "aarch64-unknown-linux-musl": "@openai/codex-linux-arm64",
-  "x86_64-apple-darwin": "@openai/codex-darwin-x64",
-  "aarch64-apple-darwin": "@openai/codex-darwin-arm64",
-  "x86_64-pc-windows-msvc": "@openai/codex-win32-x64",
-  "aarch64-pc-windows-msvc": "@openai/codex-win32-arm64",
+  "x86_64-unknown-linux-musl": "uxarion-linux-x64",
+  "aarch64-unknown-linux-musl": "uxarion-linux-arm64",
+  "x86_64-apple-darwin": "uxarion-darwin-x64",
+  "aarch64-apple-darwin": "uxarion-darwin-arm64",
+  "x86_64-pc-windows-msvc": "uxarion-win32-x64",
+  "aarch64-pc-windows-msvc": "uxarion-win32-arm64",
 };
+
+const RUNTIME_ARTIFACT_BY_TARGET = {
+  "x86_64-unknown-linux-musl": {
+    archiveName: `uxarion-${packageMetadata.version}-linux-x64.tar.xz`,
+    platformName: "linux-x64",
+  },
+};
+
+const UXARION_DOWNLOAD_BASE_URL =
+  process.env.UXARION_DOWNLOAD_BASE_URL ||
+  "https://github.com/rachidlaad/uxarion-downloads/releases/download";
 
 const { platform, arch } = process;
 
@@ -84,39 +105,6 @@ const localBinaryPath = path.join(
   codexBinaryName,
 );
 
-let vendorRoot;
-try {
-  const packageJsonPath = require.resolve(`${platformPackage}/package.json`);
-  vendorRoot = path.join(path.dirname(packageJsonPath), "vendor");
-} catch {
-  if (existsSync(localBinaryPath)) {
-    vendorRoot = localVendorRoot;
-  } else {
-    const packageManager = detectPackageManager();
-    const updateCommand =
-      packageManager === "bun"
-        ? "bun install -g @openai/codex@latest"
-        : "npm install -g @openai/codex@latest";
-    throw new Error(
-      `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
-    );
-  }
-}
-
-if (!vendorRoot) {
-  const packageManager = detectPackageManager();
-  const updateCommand =
-    packageManager === "bun"
-      ? "bun install -g @openai/codex@latest"
-      : "npm install -g @openai/codex@latest";
-  throw new Error(
-    `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
-  );
-}
-
-const archRoot = path.join(vendorRoot, targetTriple);
-const binaryPath = path.join(archRoot, "codex", codexBinaryName);
-
 // Use an asynchronous spawn instead of spawnSync so that Node is able to
 // respond to signals (e.g. Ctrl-C / SIGINT) while the native binary is
 // executing. This allows us to forward those signals to the child process
@@ -133,8 +121,16 @@ function getUpdatedPath(newDirs) {
   return updatedPath;
 }
 
+function getUxarionCacheRoot() {
+  const xdgCacheHome = process.env.XDG_CACHE_HOME;
+  if (xdgCacheHome) {
+    return path.join(xdgCacheHome, "uxarion");
+  }
+  return path.join(homedir(), ".cache", "uxarion");
+}
+
 /**
- * Use heuristics to detect the package manager that was used to install Codex
+ * Use heuristics to detect the package manager that was used to install Uxarion
  * in order to give the user a hint about how to update it.
  */
 function detectPackageManager() {
@@ -158,6 +154,101 @@ function detectPackageManager() {
   return userAgent ? "npm" : null;
 }
 
+function getReinstallMessage() {
+  const packageManager = detectPackageManager();
+  const updateCommand =
+    packageManager === "bun"
+      ? "bun install -g uxarion@latest"
+      : "npm install -g uxarion@latest";
+  return `Missing optional dependency ${platformPackage}. Reinstall Uxarion: ${updateCommand}`;
+}
+
+async function downloadRuntimeVendorRoot() {
+  const runtimeArtifact = RUNTIME_ARTIFACT_BY_TARGET[targetTriple];
+  if (!runtimeArtifact) {
+    return null;
+  }
+
+  const runtimeRoot = path.join(
+    getUxarionCacheRoot(),
+    "runtime",
+    packageMetadata.version,
+    targetTriple,
+  );
+  const vendorRoot = path.join(runtimeRoot, "package", "vendor");
+  const cachedBinaryPath = path.join(
+    vendorRoot,
+    targetTriple,
+    "codex",
+    codexBinaryName,
+  );
+  if (existsSync(cachedBinaryPath)) {
+    return vendorRoot;
+  }
+
+  mkdirSync(runtimeRoot, { recursive: true });
+  const archivePath = path.join(runtimeRoot, runtimeArtifact.archiveName);
+  if (!existsSync(archivePath)) {
+    const archiveUrl = `${UXARION_DOWNLOAD_BASE_URL}/v${packageMetadata.version}/${runtimeArtifact.archiveName}`;
+    // eslint-disable-next-line no-console
+    console.error(
+      `Downloading Uxarion runtime ${packageMetadata.version} for ${runtimeArtifact.platformName}...`,
+    );
+    const response = await fetch(archiveUrl);
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Failed to download ${runtimeArtifact.archiveName} (${response.status} ${response.statusText})`,
+      );
+    }
+
+    const partialArchivePath = `${archivePath}.partial`;
+    try {
+      await pipeline(
+        Readable.fromWeb(response.body),
+        createWriteStream(partialArchivePath),
+      );
+      renameSync(partialArchivePath, archivePath);
+    } catch (error) {
+      if (existsSync(partialArchivePath)) {
+        unlinkSync(partialArchivePath);
+      }
+      throw error;
+    }
+  }
+
+  const extractResult = spawnSync("tar", ["-xJf", archivePath, "-C", runtimeRoot], {
+    stdio: "inherit",
+  });
+  if (extractResult.status !== 0) {
+    throw new Error(
+      `Failed to extract ${runtimeArtifact.archiveName} into ${runtimeRoot}`,
+    );
+  }
+  if (!existsSync(cachedBinaryPath)) {
+    throw new Error(`Downloaded runtime is missing ${cachedBinaryPath}`);
+  }
+  return vendorRoot;
+}
+
+let vendorRoot;
+try {
+  const packageJsonPath = require.resolve(`${platformPackage}/package.json`);
+  vendorRoot = path.join(path.dirname(packageJsonPath), "vendor");
+} catch {
+  if (existsSync(localBinaryPath)) {
+    vendorRoot = localVendorRoot;
+  } else {
+    vendorRoot = await downloadRuntimeVendorRoot();
+  }
+}
+
+if (!vendorRoot) {
+  throw new Error(getReinstallMessage());
+}
+
+const archRoot = path.join(vendorRoot, targetTriple);
+const binaryPath = path.join(archRoot, "codex", codexBinaryName);
+
 const additionalDirs = [];
 const pathDir = path.join(archRoot, "path");
 if (existsSync(pathDir)) {
@@ -168,8 +259,8 @@ const updatedPath = getUpdatedPath(additionalDirs);
 const env = { ...process.env, PATH: updatedPath };
 const packageManagerEnvVar =
   detectPackageManager() === "bun"
-    ? "CODEX_MANAGED_BY_BUN"
-    : "CODEX_MANAGED_BY_NPM";
+    ? "UXARION_MANAGED_BY_BUN"
+    : "UXARION_MANAGED_BY_NPM";
 env[packageManagerEnvVar] = "1";
 
 const child = spawn(binaryPath, process.argv.slice(2), {
