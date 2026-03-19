@@ -764,7 +764,7 @@ fn normalize_chatgpt_base_url(input: &str) -> String {
 }
 
 async fn resolve_auth() -> Result<TranscriptionAuthContext, String> {
-    let codex_home = find_codex_home().map_err(|e| format!("failed to find codex home: {e}"))?;
+    let codex_home = find_codex_home().map_err(|e| format!("failed to find Uxarion home: {e}"))?;
     let auth = CodexAuth::from_auth_storage(&codex_home, AuthCredentialsStoreMode::Auto)
         .map_err(|e| format!("failed to read auth.json: {e}"))?
         .ok_or_else(|| {

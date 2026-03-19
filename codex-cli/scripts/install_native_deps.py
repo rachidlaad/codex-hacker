@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install Codex native binaries (Rust CLI plus ripgrep helpers)."""
+"""Install Uxarion native binaries (Rust CLI plus ripgrep helpers)."""
 
 import argparse
 from contextlib import contextmanager
