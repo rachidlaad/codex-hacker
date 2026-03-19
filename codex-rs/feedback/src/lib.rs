@@ -355,7 +355,7 @@ impl FeedbackSnapshot {
         if include_logs {
             attachments.push(Attachment {
                 buffer: logs_override.unwrap_or_else(|| self.bytes.clone()),
-                filename: String::from("codex-logs.log"),
+                filename: String::from("uxarion-logs.log"),
                 content_type: Some("text/plain".to_string()),
                 ty: None,
             });
@@ -540,7 +540,7 @@ mod tests {
                 .map(|attachment| attachment.filename.as_str())
                 .collect::<Vec<_>>(),
             vec![
-                "codex-logs.log",
+                "uxarion-logs.log",
                 FEEDBACK_DIAGNOSTICS_ATTACHMENT_FILENAME,
                 extra_filename.as_str()
             ]
@@ -564,7 +564,7 @@ mod tests {
                 .iter()
                 .map(|attachment| attachment.filename.as_str())
                 .collect::<Vec<_>>(),
-            vec!["codex-logs.log"]
+            vec!["uxarion-logs.log"]
         );
         assert_eq!(attachments_without_diagnostics[0].buffer, vec![1]);
         fs::remove_file(extra_path).expect("extra attachment should be removed");
